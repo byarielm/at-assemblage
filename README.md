@@ -53,8 +53,25 @@ These are what Semble actually stores. They differ in places from the original b
 **Loading.** We read all of your cards, collection links and connections once each, following the cursors. Then we join them in the browser:
 
 - **Cards:** those linked to the selected collections.
-- **Edges:** connections whose two endpoints both match a visible card, by AT URI or by normalised URL.
+- **Edges:** every connection with at least one end on a selected card. Endpoints are matched by AT URI or by normalised URL.
+- **Outside cards:** if the other end of a connection is not in the selection, it appears as a dashed card marked **Outside**. This covers three cases: a card in your library but in another collection, a card outside your library, or a bare URL. Outside cards can be inspected, connected to, and hidden with the "Show connected cards outside these collections" setting. Connections that touch no selected card are ignored.
 - **Annotations:** your Margin notes, matched to cards by normalised URL.
+
+### Editing connections
+
+| Action | How | What is written |
+| --- | --- | --- |
+| Edit the note | Select a connection, then edit it in the inspector | `putRecord` in place, with the same AT URI. A `swapRecord` guard refuses the write if the record changed elsewhere. |
+| Change the type or reverse it | Inspector: type picker or **Reverse direction**, then **Save changes** | An atomic replace (see below) |
+| Move one end | Drag the end of an edge onto another card, then confirm | An atomic replace |
+| Bulk retype | Shift-select connections (or select cards, then **Select the connections between these cards**), pick a type, then confirm | Replaces, in `applyWrites` batches of at most 100 operations. Selected connections that already have that type, or that would duplicate another connection, are skipped. |
+| Delete | **Delete** button, or the Delete key, with one or more connections selected. You confirm first. | `deleteRecord` for one connection, `applyWrites` for several |
+
+**Why type and direction changes are replacements.** Semble's indexer only applies **note** changes from record updates. See `ProcessConnectionFirehoseEventUseCase` in Semble, where source, target and type changes are ignored. If we updated the type in place, your PDS and Semble would disagree.
+
+So these edits delete the old record and create a new one in **one `applyWrites` commit**. Either both happen or neither does. The new record keeps the original `createdAt`, gets a fresh `updatedAt`, and has a new AT URI. The edited edge stays selected throughout.
+
+All edits are optimistic and roll back on failure. A failed bulk batch is reloaded from the PDS, because a batch larger than 100 operations spans several commits and earlier ones may already have landed.
 
 ### Architecture
 
@@ -125,10 +142,10 @@ npm test
 | --- | --- |
 | `src/services/atproto/identity.test.ts` | Handle/DID validation, DID document parsing, PDS resolution |
 | `src/services/atproto/session.test.ts` | App Password sign-in success and failure, two-factor flow, single-flight refresh after expiry, revoked refresh token, resume, sign-out, what gets persisted |
-| `src/services/sources/semble/mapping.test.ts` | Semble records → graph, note folding, URL/AT URI endpoint resolution, connection record building and lexicon validation, unknown-type fallback, duplicates |
-| `src/services/sources/semble/api.test.ts` | Cursor pagination (250 records), invalid-record handling, connection create/delete |
+| `src/services/sources/semble/mapping.test.ts` | Semble records → graph, note folding, URL/AT URI endpoint resolution, outside cards, connection record building and lexicon validation, edit planning (in-place update vs replace), unknown-type fallback, duplicates |
+| `src/services/sources/semble/api.test.ts` | Cursor pagination (250 records), invalid-record handling, connection create/delete, in-place note update and swap conflicts, atomic replace, 240-operation batches split without separating a replacement's delete and create, bulk delete |
 | `src/services/sources/margin/notes.test.ts` | Margin note building, validation, round-trip |
-| `src/queries/semble.test.tsx` | Optimistic create, rollback on failure (with retry draft), delete rollback, duplicate guard |
+| `src/queries/semble.test.tsx` | Optimistic create, rollback on failure (with retry draft), delete rollback, duplicate guard; edits that keep selection through a replace; rollback on a swap conflict; bulk retype and delete |
 | `src/graph/filters.test.ts`, `src/services/sources/url.test.ts` | Search, filters, URL normalisation |
 | `src/components/auth/SignInScreen.test.tsx` | Rejecting non-App-Passwords, two-factor prompt, credential errors |
 
@@ -151,6 +168,16 @@ The app was driven end to end in Chromium (Playwright) against the fake PDS, wit
 - transparent token refresh
 - sign-out (`deleteSession` called, no stored session left)
 
+A second run covered connection editing. It checked these against the stored records:
+
+- outside cards
+- an in-place note edit (same record key)
+- a type change plus reversal as one `applyWrites` commit, with the note and `createdAt` kept and the edge still selected
+- dragging an edge end to another card (the orphaned outside card disappears)
+- a bulk retype of 3 connections
+- a bulk delete with the keyboard
+- hiding outside cards
+
 Scale, measured in headless Chromium with software rendering:
 
 | Cards | Load and first layout |
@@ -165,7 +192,8 @@ Panning stays usable at 300 cards: about 28 fps headless, which should be higher
 
 - **Own records only.** Cards that other people added to your open collections live in their repos and are not loaded. The same applies to other people's connections and Margin notes. Reading those needs an AppView.
 - **Margin notes are basic.** You can read your own notes on a card's URL and create plain `commenting` notes. Editing, highlights, selectors and bookmarks are not supported.
-- **No editing of connections.** Delete a connection and recreate it to change it, which matches how Semble treats type and endpoint changes.
+- **Changing a connection's type or ends gives it a new AT URI.** This is the price of staying in sync with Semble (see [Editing connections](#editing-connections)). Anything that linked to the old URI will not follow it.
+- **Edges are drawn from the right-hand side of a card to the left-hand side of the next.** A reversed or moved connection whose source sits to the right of its target loops around until you click "Tidy layout".
 - **Handle resolution uses a public resolver.** By default this is `public.api.bsky.app`. Enter a DID to skip it entirely.
 - **Positions are per browser.** Layout is not synced across devices.
 - **Favicons** are loaded directly from each card's domain, with no referrer.

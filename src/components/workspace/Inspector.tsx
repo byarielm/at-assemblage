@@ -7,6 +7,9 @@ import { isHttpUrl } from '../../services/sources/url'
 import { useUiStore } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button } from '../ui/Button'
+import { ConnectionEditPanel } from './ConnectionEditPanel'
+import { SelectionPanel } from './SelectionPanel'
+import { TypeSwatch } from './TypeSwatch'
 import { useWorkspace } from './WorkspaceContext'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -24,15 +27,6 @@ function formatDate(iso?: string) {
   return Number.isNaN(d.getTime()) ? undefined : d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function TypeSwatch({ type }: { type?: string }) {
-  const style = styleForType(type)
-  return (
-    <svg width="18" height="6" aria-hidden="true" className="shrink-0">
-      <line x1="0" y1="3" x2="18" y2="3" stroke={style.colour} strokeWidth="2.5" strokeDasharray={style.dash} />
-    </svg>
-  )
-}
-
 function LinkRow({ link, other, direction }: { link: GraphLink; other?: GraphItem; direction: 'out' | 'in' }) {
   const requestSelection = useUiStore((s) => s.requestSelection)
   const style = styleForType(link.type)
@@ -46,6 +40,7 @@ function LinkRow({ link, other, direction }: { link: GraphLink; other?: GraphIte
         <TypeSwatch type={link.type} />
         <span className="shrink-0 text-ink-3">{direction === 'out' ? `${style.label} →` : `← ${style.label}`}</span>
         <span className="min-w-0 truncate">{other?.title ?? 'Unknown card'}</span>
+        {other?.external ? <span className="shrink-0 text-[11px] text-ink-3">outside</span> : null}
         {link.pending ? <span className="ml-auto text-[11px] text-accent">saving</span> : null}
       </button>
     </li>
@@ -101,6 +96,13 @@ function ItemDetails({ item }: { item: GraphItem }) {
 
   return (
     <>
+      {item.external ? (
+        <div className="px-4 pt-3">
+          <Alert tone="info">
+            {item.external.label}. It appears because a connection from your selected collections points to it.
+          </Alert>
+        </div>
+      ) : null}
       <div className="px-4 py-3">
         <div className="text-[12px] text-ink-3">{item.siteName ?? item.domain ?? (item.kind === 'NOTE' ? 'Note card' : 'Card')}</div>
         <h2 className="mt-0.5 text-[15px] font-semibold leading-snug">{item.title}</h2>
@@ -137,15 +139,17 @@ function ItemDetails({ item }: { item: GraphItem }) {
           </ul>
         </Section>
       ) : null}
-      <Section title="Collections">
-        <div className="flex flex-wrap gap-1">
-          {item.groupIds.map((g) => (
-            <span key={g} className="rounded border border-line px-1.5 py-0.5 text-[12px] text-ink-2">
-              {groupNames.get(g) ?? 'Collection'}
-            </span>
-          ))}
-        </div>
-      </Section>
+      {item.groupIds.length > 0 ? (
+        <Section title="Collections">
+          <div className="flex flex-wrap gap-1">
+            {item.groupIds.map((g) => (
+              <span key={g} className="rounded border border-line px-1.5 py-0.5 text-[12px] text-ink-2">
+                {groupNames.get(g) ?? 'Collection'}
+              </span>
+            ))}
+          </div>
+        </Section>
+      ) : null}
       <Section title={`Connections (${outgoing.length + incoming.length})`}>
         {outgoing.length + incoming.length === 0 ? (
           <p className="text-[13px] text-ink-3">None yet. Drag from the right-hand handle of this card to another card.</p>
@@ -180,73 +184,6 @@ function ItemDetails({ item }: { item: GraphItem }) {
   )
 }
 
-function LinkDetails({ link }: { link: GraphLink }) {
-  const { itemsById } = useWorkspace()
-  const requestDeleteLink = useUiStore((s) => s.requestDeleteLink)
-  const requestSelection = useUiStore((s) => s.requestSelection)
-  const style = styleForType(link.type)
-  const source = itemsById.get(link.sourceId)
-  const target = itemsById.get(link.targetId)
-
-  const endpoint = (label: string, item?: GraphItem) => (
-    <button
-      type="button"
-      onClick={() => item && requestSelection({ nodes: [item.id], edges: [] })}
-      className="w-full rounded-md border border-line px-2.5 py-1.5 text-left hover:bg-surface-2"
-    >
-      <span className="block text-[11px] uppercase tracking-wide text-ink-3">{label}</span>
-      <span className="block truncate text-[13px] font-medium">{item?.title ?? 'Unknown card'}</span>
-    </button>
-  )
-
-  return (
-    <>
-      <div className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <TypeSwatch type={link.type} />
-          <h2 className="text-[15px] font-semibold">{style.label}</h2>
-          {!style.known ? <span className="rounded bg-surface-2 px-1.5 text-[11px] text-ink-3">unknown type</span> : null}
-        </div>
-        {link.pending ? <p className="mt-1 text-[13px] text-accent">Saving to your PDS…</p> : null}
-      </div>
-      <Section title="Direction">
-        <div className="space-y-1.5">
-          {endpoint('From', source)}
-          <div aria-hidden="true" className="text-center text-ink-3">
-            ↓
-          </div>
-          {endpoint('To', target)}
-        </div>
-      </Section>
-      {link.note ? (
-        <Section title="Note">
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{link.note}</p>
-        </Section>
-      ) : null}
-      <Section title="Record">
-        <dl className="space-y-1 text-[12px]">
-          {formatDate(link.createdAt) ? (
-            <div className="flex gap-2">
-              <dt className="text-ink-3">Created</dt>
-              <dd>{formatDate(link.createdAt)}</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt className="text-ink-3">AT URI</dt>
-            <dd className="break-all font-mono text-[11px]">{link.pending ? '—' : link.id}</dd>
-          </div>
-        </dl>
-      </Section>
-      <div className="border-t border-line px-4 py-3">
-        <Button variant="danger" icon="trash" size="sm" disabled={link.pending} onClick={() => requestDeleteLink(link.id)}>
-          Delete connection
-        </Button>
-        <p className="mt-1.5 text-[11.5px] text-ink-3">Or press Delete with the connection selected.</p>
-      </div>
-    </>
-  )
-}
-
 function Legend() {
   return (
     <Section title="Connection types">
@@ -270,7 +207,7 @@ function Legend() {
 
 export function Inspector() {
   const selected = useUiStore((s) => s.selected)
-  const { itemsById, linksById } = useWorkspace()
+  const { itemsById, linksById, connectionRecords } = useWorkspace()
   const count = selected.nodes.length + selected.edges.length
   const item = selected.nodes.length === 1 && count === 1 ? itemsById.get(selected.nodes[0]!) : undefined
   const link = selected.edges.length === 1 && count === 1 ? linksById.get(selected.edges[0]!) : undefined
@@ -282,12 +219,9 @@ export function Inspector() {
         {item ? (
           <ItemDetails key={item.id} item={item} />
         ) : link ? (
-          <LinkDetails key={link.id} link={link} />
+          <ConnectionEditPanel key={`${link.id}:${connectionRecords.get(link.id)?.cid}`} link={link} />
         ) : count > 1 ? (
-          <div className="px-4 py-3 text-[13px] text-ink-2">
-            {selected.nodes.length} card{selected.nodes.length === 1 ? '' : 's'} and {selected.edges.length} connection
-            {selected.edges.length === 1 ? '' : 's'} selected.
-          </div>
+          <SelectionPanel />
         ) : (
           <>
             <div className="px-4 py-3 text-[13px] leading-relaxed text-ink-2">

@@ -1,6 +1,6 @@
 import type { StoredRecord } from '../records'
 import { styleForType, typeInfo } from './connectionTypes'
-import { buildConnectionRecord, buildSembleGraph, endpointFor, isDuplicateLink } from './mapping'
+import { buildConnectionRecord, buildSembleGraph, endpointFor, isDuplicateLink, planConnectionEdit } from './mapping'
 import type { CardRecord, CollectionLinkRecord, ConnectionRecord, SembleLibrary } from './types'
 
 const CID = 'bafyreidmfvmmnzqxgkwexzt73uopc4kiycmdogbedw4ijduxobwvla6sua'
@@ -91,9 +91,10 @@ describe('buildSembleGraph', () => {
     ],
   }
 
-  it('includes only cards linked to the selected collections', () => {
+  it('includes cards linked to the selected collections as regular items', () => {
     const graph = buildSembleGraph([COLL_A], library, connections)
-    expect(graph.items.map((i) => i.id).sort()).toEqual([a.uri, b.uri, standaloneNote.uri].sort())
+    const regular = graph.items.filter((i) => !i.external).map((i) => i.id)
+    expect(regular.sort()).toEqual([a.uri, b.uri, standaloneNote.uri].sort())
   })
 
   it('records every selected collection a card belongs to', () => {
@@ -117,12 +118,45 @@ describe('buildSembleGraph', () => {
     expect(graph.items.find((i) => i.id === b.uri)?.domain).toBe('example.org')
   })
 
-  it('resolves connection endpoints by URL or AT URI and drops ones outside the selection', () => {
+  it('resolves connection endpoints by URL or AT URI', () => {
     const graph = buildSembleGraph([COLL_A], library, connections)
-    expect(graph.links.map((l) => [l.sourceId, l.targetId, l.type])).toEqual([
+    expect(graph.links.slice(0, 2).map((l) => [l.sourceId, l.targetId, l.type])).toEqual([
       [a.uri, b.uri, 'SUPPORTS'],
       [b.uri, standaloneNote.uri, 'MYSTERY'],
     ])
+  })
+
+  it('turns off-selection endpoints into external items', () => {
+    const graph = buildSembleGraph([COLL_A], library, connections)
+    // k3: a → c, where c is in the library but only in COLL_B
+    const toC = graph.links.find((l) => l.id.endsWith('/k3'))!
+    expect(toC.targetId).toBe(c.uri)
+    const itemC = graph.items.find((i) => i.id === c.uri)!
+    expect(itemC.external?.label).toMatch(/not in the selected collections/)
+    expect(itemC.groupIds).toEqual([])
+    // k4: a bare URL that is not a card at all
+    const fromUrl = graph.links.find((l) => l.id.endsWith('/k4'))!
+    expect(fromUrl.sourceId).toBe('url:https://unrelated.example')
+    expect(graph.items.find((i) => i.id === fromUrl.sourceId)).toMatchObject({
+      title: 'unrelated.example',
+      external: { label: expect.stringMatching(/not saved/) },
+    })
+  })
+
+  it('ignores connections that do not touch the selection and shares external items', () => {
+    const extra = {
+      invalid: 0,
+      connections: [
+        connection('x1', 'https://far.example/1', 'https://far.example/2'),
+        connection('x2', 'https://example.com/a', 'at://did:plc:someoneelse/network.cosmik.card/zz'),
+        connection('x3', 'https://www.example.org/b', 'at://did:plc:someoneelse/network.cosmik.card/zz'),
+      ],
+    }
+    const graph = buildSembleGraph([COLL_A], library, extra)
+    expect(graph.links.map((l) => l.id.split('/').pop())).toEqual(['x2', 'x3'])
+    const externals = graph.items.filter((i) => i.external)
+    expect(externals).toHaveLength(1)
+    expect(externals[0]!.external?.label).toMatch(/outside your library/)
   })
 
   it('reports missing cards and invalid records as warnings', () => {
@@ -186,5 +220,54 @@ describe('connection types', () => {
     expect(isDuplicateLink(links, 'a', 'b', 'supports')).toBe(true)
     expect(isDuplicateLink(links, 'b', 'a', 'SUPPORTS')).toBe(false)
     expect(isDuplicateLink(links, 'a', 'b', 'OPPOSES')).toBe(false)
+  })
+})
+
+describe('planConnectionEdit', () => {
+  const existing: ConnectionRecord = {
+    $type: 'network.cosmik.connection',
+    source: 'https://a.example',
+    target: 'https://b.example',
+    connectionType: 'SUPPORTS',
+    note: 'old note',
+    createdAt: '2026-01-01T00:00:00.000Z' as ConnectionRecord['createdAt'],
+  }
+  const now = new Date('2026-10-20T12:00:00.000Z')
+
+  it('is a no-op when nothing meaningful changes', () => {
+    expect(planConnectionEdit(existing, { type: 'supports', note: ' old note ' }, now)).toEqual({ kind: 'noop' })
+  })
+
+  it('updates in place when only the note changes, keeping createdAt', () => {
+    const plan = planConnectionEdit(existing, { note: 'new note' }, now)
+    expect(plan.kind).toBe('update')
+    expect(plan.kind !== 'noop' && plan.record).toMatchObject({
+      note: 'new note',
+      connectionType: 'SUPPORTS',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-10-20T12:00:00.000Z',
+    })
+  })
+
+  it('removes an emptied note', () => {
+    const plan = planConnectionEdit(existing, { note: '  ' }, now)
+    expect(plan.kind === 'update' && plan.record).not.toHaveProperty('note')
+  })
+
+  it('replaces when the type changes (Semble ignores type changes in updates)', () => {
+    const plan = planConnectionEdit(existing, { type: 'opposes', note: 'changed too' }, now)
+    expect(plan).toMatchObject({ kind: 'replace', record: { connectionType: 'OPPOSES', note: 'changed too' } })
+  })
+
+  it('replaces when reversed or re-pointed', () => {
+    expect(planConnectionEdit(existing, { source: existing.target, target: existing.source }, now)).toMatchObject({
+      kind: 'replace',
+      record: { source: 'https://b.example', target: 'https://a.example' },
+    })
+    expect(planConnectionEdit(existing, { target: 'https://c.example' }, now).kind).toBe('replace')
+  })
+
+  it('validates the new record', () => {
+    expect(() => planConnectionEdit(existing, { note: 'x'.repeat(1001) }, now)).toThrow()
   })
 })

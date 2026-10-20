@@ -30,6 +30,11 @@ export type GraphItem = {
   /** Value other records use to point at this item (URL or AT URI). */
   endpoints: string[]
   createdAt?: string
+  /**
+   * Set when the item is outside the loaded groups and is shown only because
+   * a link reaches it. `label` explains why, in the source's own terms.
+   */
+  external?: { label: string }
 }
 
 export type GraphLink = {

@@ -1,5 +1,6 @@
 import type { GraphData, GraphGroup, GraphItem, GraphLink } from '../../../graph/model'
 import { network } from '../../../lexicons'
+import { isAtUri } from '../../atproto/aturi'
 import { cleanUrl, domainOf, normaliseUrl } from '../url'
 import type { StoredRecord } from '../records'
 import type {
@@ -33,6 +34,11 @@ function urlContent(card: CardRecord): UrlContent | undefined {
 
 function noteContent(card: CardRecord): NoteContent | undefined {
   return network.cosmik.card.noteContent.isTypeOf(card.content) ? card.content : undefined
+}
+
+function shortAtUri(uri: string): string {
+  const [, , authority = '', , rkey = ''] = uri.split('/')
+  return `${authority.length > 24 ? `${authority.slice(0, 20)}…` : authority} / ${rkey}`
 }
 
 function firstLine(text: string, max = 80): string {
@@ -81,8 +87,9 @@ function connectionToLink(rec: StoredRecord<ConnectionRecord>, sourceId: string,
  *
  * - Items: cards linked (via collectionLink) to any selected collection.
  *   NOTE cards with a `parentCard` are folded into their parent as notes.
- * - Links: connections whose source and target both resolve to a visible
- *   item, matched by card AT URI or by normalised URL.
+ * - Links: connections with at least one end on a selected card, matched by
+ *   card AT URI or normalised URL. The other end, if outside the selection,
+ *   becomes an `external` item (library card, foreign card or bare URL).
  */
 export function buildSembleGraph(
   selectedCollectionIds: readonly string[],
@@ -122,20 +129,79 @@ export function buildSembleGraph(
 
   const items: GraphItem[] = []
   const itemByEndpoint = new Map<string, string>()
-  for (const [cardUri, groupIds] of groupsByCard) {
-    const item = cardToItem(cardsByUri.get(cardUri)!, groupIds, notesByParent.get(cardUri) ?? [])
+  const register = (item: GraphItem) => {
     items.push(item)
     for (const endpoint of item.endpoints) {
       if (!itemByEndpoint.has(endpoint)) itemByEndpoint.set(endpoint, item.id)
     }
   }
+  const regularIds = new Set<string>()
+  for (const [cardUri, groupIds] of groupsByCard) {
+    const item = cardToItem(cardsByUri.get(cardUri)!, groupIds, notesByParent.get(cardUri) ?? [])
+    register(item)
+    regularIds.add(item.id)
+  }
+
+  // Library cards outside the selection, indexed so off-graph endpoints can show real titles.
+  const libraryByEndpoint = new Map<string, StoredRecord<CardRecord>>()
+  for (const card of library.cards) {
+    if (groupsByCard.has(card.uri) || card.value.parentCard) continue
+    libraryByEndpoint.set(card.uri, card)
+    const url = card.value.url ?? urlContent(card.value)?.url
+    if (url && !libraryByEndpoint.has(normaliseUrl(url))) libraryByEndpoint.set(normaliseUrl(url), card)
+  }
 
   const resolve = (endpoint: string) => itemByEndpoint.get(endpoint) ?? itemByEndpoint.get(normaliseUrl(endpoint))
+
+  /** Creates (once) an external item for an endpoint that is not in the selected collections. */
+  const externalFor = (endpoint: string): string => {
+    const existing = resolve(endpoint)
+    if (existing) return existing
+    const card = libraryByEndpoint.get(endpoint) ?? libraryByEndpoint.get(normaliseUrl(endpoint))
+    if (card) {
+      const item = cardToItem(card, [], notesByParent.get(card.uri) ?? [])
+      item.external = { label: 'In your library, not in the selected collections' }
+      register(item)
+      return item.id
+    }
+    if (isAtUri(endpoint)) {
+      register({
+        id: endpoint,
+        kind: 'CARD',
+        title: shortAtUri(endpoint),
+        notes: [],
+        groupIds: [],
+        endpoints: [endpoint],
+        external: { label: 'A card outside your library' },
+      })
+      return endpoint
+    }
+    const url = normaliseUrl(endpoint)
+    register({
+      id: `url:${url}`,
+      kind: 'URL',
+      title: cleanUrl(endpoint),
+      url: endpoint,
+      domain: domainOf(endpoint),
+      notes: [],
+      groupIds: [],
+      endpoints: [url],
+      external: { label: 'A page you have not saved as a card' },
+    })
+    return `url:${url}`
+  }
+
   const links: GraphLink[] = []
   for (const rec of connections.connections) {
-    const sourceId = resolve(rec.value.source)
-    const targetId = resolve(rec.value.target)
-    if (sourceId && targetId) links.push(connectionToLink(rec, sourceId, targetId))
+    const s = resolve(rec.value.source)
+    const t = resolve(rec.value.target)
+    const sourceInside = !!s && regularIds.has(s)
+    const targetInside = !!t && regularIds.has(t)
+    // Only connections that touch the selection are relevant.
+    if (!sourceInside && !targetInside) continue
+    const sourceId = sourceInside ? s! : externalFor(rec.value.source)
+    const targetId = targetInside ? t! : externalFor(rec.value.target)
+    links.push(connectionToLink(rec, sourceId, targetId))
   }
 
   const invalid = library.invalid + connections.invalid
@@ -177,4 +243,54 @@ export function buildConnectionRecord(draft: ConnectionDraft, now = new Date()):
 export function isDuplicateLink(links: readonly GraphLink[], sourceId: string, targetId: string, type: string): boolean {
   const t = type.trim().toUpperCase()
   return links.some((l) => l.sourceId === sourceId && l.targetId === targetId && (l.type ?? '').toUpperCase() === t)
+}
+
+export type ConnectionChanges = {
+  type?: string
+  note?: string
+  /** New endpoint values (see `endpointFor`). */
+  source?: string
+  target?: string
+}
+
+/**
+ * - `update`: only the note changed. Rewritten in place (same AT URI).
+ * - `replace`: type or endpoints changed. Semble's indexer applies only note
+ *   changes from record updates (see its ProcessConnectionFirehoseEventUseCase),
+ *   so these must be a delete + create to stay in sync with Semble.
+ */
+export type EditPlan =
+  | { kind: 'noop' }
+  | { kind: 'update'; record: ConnectionRecord }
+  | { kind: 'replace'; record: ConnectionRecord }
+
+const normType = (t?: string) => t?.trim().toUpperCase() || undefined
+const normNote = (n?: string) => n?.trim() || undefined
+
+/** Plans an edit to an existing connection. The new record is validated against the lexicon. */
+export function planConnectionEdit(existing: ConnectionRecord, changes: ConnectionChanges, now = new Date()): EditPlan {
+  const next = {
+    source: changes.source ?? existing.source,
+    target: changes.target ?? existing.target,
+    type: changes.type !== undefined ? normType(changes.type) : normType(existing.connectionType),
+    note: changes.note !== undefined ? normNote(changes.note) : normNote(existing.note),
+  }
+  const structural =
+    next.source !== existing.source || next.target !== existing.target || next.type !== normType(existing.connectionType)
+  const noteChanged = next.note !== normNote(existing.note)
+  if (!structural && !noteChanged) return { kind: 'noop' }
+
+  const timestamp = now.toISOString() as ConnectionRecord['createdAt']
+  const record = network.cosmik.connection.$parse(
+    network.cosmik.connection.$build({
+      source: next.source,
+      target: next.target,
+      ...(next.type ? { connectionType: next.type } : {}),
+      ...(next.note ? { note: next.note } : {}),
+      // Keep the original creation time: this is the same connection, edited.
+      createdAt: existing.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    }),
+  )
+  return { kind: structural ? 'replace' : 'update', record }
 }

@@ -21,11 +21,15 @@ type UiState = {
   positions: Positions
   selected: SelectionIds
   /** Programmatic selection (e.g. clicking a related card in the inspector). */
-  selectionRequest: (SelectionIds & { nonce: number }) | null
+  selectionRequest: (SelectionIds & { nonce: number; focus: boolean }) | null
   filters: GraphFilters
   draft: LinkDraft | null
-  pendingDeleteLinkId: string | null
+  /** Connections awaiting delete confirmation. */
+  pendingDeleteLinkIds: string[]
+  /** A dragged edge end awaiting confirmation: the connection and its proposed endpoints. */
+  reconnectDraft: { linkId: string; sourceId: string; targetId: string } | null
   showEdgeLabels: boolean
+  showExternal: boolean
   /** Bumped to request a fresh ELK layout of every visible node. */
   tidyRequest: number
   notices: Notice[]
@@ -36,12 +40,15 @@ type UiState = {
   mergePositions: (positions: Positions) => void
   movePosition: (id: string, pos: Position) => void
   setSelected: (selected: SelectionIds) => void
-  requestSelection: (selected: SelectionIds) => void
+  /** Selects in the canvas; `focus` (default true) also pans and zooms to it. */
+  requestSelection: (selected: SelectionIds, opts?: { focus?: boolean }) => void
   setFilters: (patch: Partial<GraphFilters>) => void
   resetFilters: () => void
   setDraft: (draft: LinkDraft | null) => void
-  requestDeleteLink: (id: string | null) => void
+  requestDeleteLinks: (ids: string[]) => void
+  setReconnectDraft: (draft: UiState['reconnectDraft']) => void
   setShowEdgeLabels: (show: boolean) => void
+  setShowExternal: (show: boolean) => void
   requestTidy: () => void
   notify: (notice: Omit<Notice, 'id'>) => void
   dismissNotice: (id: number) => void
@@ -56,8 +63,10 @@ const initial = {
   selectionRequest: null as UiState['selectionRequest'],
   filters: EMPTY_FILTERS,
   draft: null as LinkDraft | null,
-  pendingDeleteLinkId: null as string | null,
+  pendingDeleteLinkIds: [] as string[],
+  reconnectDraft: null as UiState['reconnectDraft'],
   showEdgeLabels: false,
+  showExternal: true,
   tidyRequest: 0,
   notices: [] as Notice[],
 }
@@ -77,13 +86,18 @@ export const useUiStore = create<UiState>()((set) => ({
   mergePositions: (positions) => set((s) => ({ positions: { ...s.positions, ...positions } })),
   movePosition: (id, pos) => set((s) => ({ positions: { ...s.positions, [id]: pos } })),
   setSelected: (selected) => set({ selected }),
-  requestSelection: (selected) =>
-    set((s) => ({ selectionRequest: { ...selected, nonce: (s.selectionRequest?.nonce ?? 0) + 1 } })),
+  requestSelection: (selected, opts) =>
+    set((s) => ({
+      selected: { nodes: selected.nodes, edges: selected.edges },
+      selectionRequest: { ...selected, focus: opts?.focus ?? true, nonce: (s.selectionRequest?.nonce ?? 0) + 1 },
+    })),
   setFilters: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
   resetFilters: () => set({ filters: EMPTY_FILTERS }),
   setDraft: (draft) => set({ draft }),
-  requestDeleteLink: (id) => set({ pendingDeleteLinkId: id }),
+  requestDeleteLinks: (ids) => set({ pendingDeleteLinkIds: ids }),
+  setReconnectDraft: (reconnectDraft) => set({ reconnectDraft }),
   setShowEdgeLabels: (showEdgeLabels) => set({ showEdgeLabels }),
+  setShowExternal: (showExternal) => set({ showExternal }),
   requestTidy: () => set((s) => ({ tidyRequest: s.tidyRequest + 1 })),
   notify: (notice) => set((s) => ({ notices: [...s.notices.slice(-3), { ...notice, id: ++noticeId }] })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),

@@ -47,6 +47,7 @@ export function StatusBar() {
   const notices = useUiStore((s) => s.notices)
   const { data, visible, connections, margin, library } = useWorkspace()
   const saving = data.links.some((l) => l.pending)
+  const external = data.items.filter((i) => i.external && visible.itemIds.has(i.id)).length
   const fetching = connections.isFetching || library.isFetching || margin.isFetching
 
   return (
@@ -58,7 +59,8 @@ export function StatusBar() {
       </div>
       <div className="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-[12px] text-ink-3">
         <span>
-          {visible.itemIds.size} cards · {visible.linkIds.size} connections
+          {visible.itemIds.size - external} cards
+          {external ? ` · ${external} outside` : ''} · {visible.linkIds.size} connections
         </span>
         {saving ? <span className="text-accent">Saving…</span> : fetching ? <span>Syncing with your PDS…</span> : <span>Up to date</span>}
         <span className="ml-auto">Positions are saved in this browser only</span>

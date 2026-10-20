@@ -4,6 +4,12 @@
  * PasswordSession (login, refresh, retry, pagination) without a network.
  */
 export const TEST_CID = 'bafyreidmfvmmnzqxgkwexzt73uopc4kiycmdogbedw4ijduxobwvla6sua'
+/** Valid CIDs used to represent successive versions of a record. */
+const CIDS = [
+  TEST_CID,
+  'bafyreihu3jjbuiipkxxqnjg3epnc43sgs33a5urmtvlcw4uaoodd4wo7m4',
+  'bafyreihmqiz5zcvbed5ydtu7souaqkmtphzjnzrii6qesczxpixzhy52gu',
+]
 
 export const RESOLVER = 'https://public.api.bsky.app'
 export const PLC = 'https://plc.directory'
@@ -47,6 +53,20 @@ export class FakePds {
   }
 
   private gates = new Map<string, Promise<void>>()
+  /** Bumped by putRecord so swapRecord can detect concurrent edits. */
+  private versions = new Map<string, number>()
+  lastApplyWrites = 0
+
+  /** Simulates an edit made elsewhere (another client) to a record. */
+  touch(uri: string) {
+    const [, , , collection, rkey] = uri.split('/')
+    const k = `${collection}/${rkey}`
+    this.versions.set(k, (this.versions.get(k) ?? 0) + 1)
+  }
+
+  private cidOf(collection: string, rkey: string) {
+    return CIDS[(this.versions.get(`${collection}/${rkey}`) ?? 0) % CIDS.length]!
+  }
 
   /** Holds the next call to `nsid` until the returned function is called. */
   holdNext(nsid: string): () => void {
@@ -190,7 +210,7 @@ export class FakePds {
         const page = start === -1 ? [] : entries.slice(start, start + limit)
         const next = start !== -1 && start + limit < entries.length ? page[page.length - 1]?.[0] : undefined
         return json(200, {
-          records: page.map(([rkey, value]) => ({ uri: `at://${this.account.did}/${collection}/${rkey}`, cid: TEST_CID, value })),
+          records: page.map(([rkey, value]) => ({ uri: `at://${this.account.did}/${collection}/${rkey}`, cid: this.cidOf(collection, rkey), value })),
           ...(next ? { cursor: next } : {}),
         })
       }
@@ -198,6 +218,36 @@ export class FakePds {
         const body = (await req.json()) as { collection: string; record: Record<string, unknown>; rkey?: string }
         const uri = this.putRecord(body.collection, body.record, body.rkey)
         return json(200, { uri, cid: TEST_CID, commit: { cid: TEST_CID, rev: '3l2222222222a' }, validationStatus: 'unknown' })
+      }
+      case 'com.atproto.repo.putRecord': {
+        const body = (await req.json()) as { collection: string; rkey: string; record: Record<string, unknown>; swapRecord?: string }
+        if (body.swapRecord && body.swapRecord !== this.cidOf(body.collection, body.rkey)) {
+          return json(400, { error: 'InvalidSwap', message: 'Record was at a different CID' })
+        }
+        const uri = this.putRecord(body.collection, body.record, body.rkey)
+        this.versions.set(`${body.collection}/${body.rkey}`, (this.versions.get(`${body.collection}/${body.rkey}`) ?? 0) + 1)
+        return json(200, { uri, cid: this.cidOf(body.collection, body.rkey) })
+      }
+      case 'com.atproto.repo.applyWrites': {
+        const body = (await req.json()) as {
+          writes: { $type: string; collection: string; rkey?: string; value?: Record<string, unknown> }[]
+        }
+        this.lastApplyWrites = body.writes.length
+        // Atomic: validate every delete first, then apply all or nothing.
+        for (const w of body.writes) {
+          if (w.$type.endsWith('#delete') && !this.records.get(w.collection)?.has(w.rkey!)) {
+            return json(400, { error: 'InvalidRequest', message: `Could not find record: ${w.rkey}` })
+          }
+        }
+        const results = body.writes.map((w) => {
+          if (w.$type.endsWith('#delete')) {
+            this.records.get(w.collection)!.delete(w.rkey!)
+            return { $type: 'com.atproto.repo.applyWrites#deleteResult' }
+          }
+          const uri = this.putRecord(w.collection, w.value!, w.rkey)
+          return { $type: 'com.atproto.repo.applyWrites#createResult', uri, cid: TEST_CID }
+        })
+        return json(200, { commit: { cid: TEST_CID, rev: '3l2222222222c' }, results })
       }
       case 'com.atproto.repo.deleteRecord': {
         const body = (await req.json()) as { collection: string; rkey: string }

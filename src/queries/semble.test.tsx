@@ -4,7 +4,8 @@ import type { SembleConnections } from '../services/sources/semble/types'
 import { useUiStore } from '../state/uiStore'
 import { signedInFakePds, makeWrapper } from '../test/withAuth'
 import { queryKeys } from './keys'
-import { useConnections, useCreateConnection, useDeleteConnection } from './semble'
+import { useBulkConnectionWrites, useConnections, useCreateConnection, useDeleteConnection, useEditConnection } from './semble'
+import { planConnectionEdit } from '../services/sources/semble/mapping'
 
 const source: GraphItem = { id: 'at://did:plc:x/network.cosmik.card/a', kind: 'URL', title: 'A', url: 'https://a.example', notes: [], groupIds: [], endpoints: [] }
 const target: GraphItem = { ...source, id: 'at://did:plc:x/network.cosmik.card/b', title: 'B', url: 'https://b.example' }
@@ -14,7 +15,13 @@ async function setup() {
   const { pds, auth } = await signedInFakePds()
   const { Wrapper, queryClient } = makeWrapper(auth)
   const hook = renderHook(
-    () => ({ list: useConnections(), create: useCreateConnection(), remove: useDeleteConnection() }),
+    () => ({
+      list: useConnections(),
+      create: useCreateConnection(),
+      remove: useDeleteConnection(),
+      edit: useEditConnection(),
+      bulk: useBulkConnectionWrites(),
+    }),
     { wrapper: Wrapper },
   )
   await waitFor(() => expect(hook.result.current.list.isSuccess).toBe(true))
@@ -76,5 +83,66 @@ describe('connection mutations', () => {
     await act(() => hook.result.current.remove.mutateAsync(cache().connections[0]!.uri))
     expect(cache().connections).toHaveLength(0)
     expect(pds.records.get('network.cosmik.connection')?.size).toBe(0)
+  })
+})
+
+describe('editing mutations', () => {
+  async function withOne() {
+    const ctx = await setup()
+    await act(() => ctx.hook.result.current.create.mutateAsync(input))
+    return { ...ctx, stored: ctx.cache().connections[0]! }
+  }
+
+  it('keeps the edited edge selected across a replace (temp URI, then the new URI)', async () => {
+    const { pds, hook, cache, stored } = await withOne()
+    useUiStore.getState().setSelected({ nodes: [], edges: [stored.uri] })
+    const plan = planConnectionEdit(stored.value, { type: 'OPPOSES' })
+    if (plan.kind !== 'replace') throw new Error('expected replace')
+
+    const release = pds.holdNext('com.atproto.repo.applyWrites')
+    act(() => hook.result.current.edit.mutate({ stored, plan }))
+    await waitFor(() => expect(cache().connections[0]?.pending).toBe(true))
+    expect(useUiStore.getState().selectionRequest?.edges[0]).toMatch(/^pending:/)
+
+    release()
+    await waitFor(() => expect(hook.result.current.edit.isSuccess).toBe(true))
+    const saved = cache().connections[0]!
+    expect(saved.uri).toMatch(/^at:\/\//)
+    expect(saved.uri).not.toBe(stored.uri)
+    expect(saved.value.connectionType).toBe('OPPOSES')
+    expect(useUiStore.getState().selectionRequest?.edges).toEqual([saved.uri])
+  })
+
+  it('rolls back an edit that the PDS rejects', async () => {
+    const { pds, hook, cache, stored } = await withOne()
+    const plan = planConnectionEdit(stored.value, { note: 'new' })
+    if (plan.kind !== 'update') throw new Error('expected update')
+    pds.touch(stored.uri) // someone else changed it → InvalidSwap
+    act(() => hook.result.current.edit.mutate({ stored, plan }))
+    await waitFor(() => expect(hook.result.current.edit.isError).toBe(true))
+    expect(cache().connections[0]).toEqual(stored)
+    expect(useUiStore.getState().notices.at(-1)?.message).toMatch(/changed elsewhere/)
+  })
+
+  it('bulk retypes and deletes optimistically, then confirms', async () => {
+    const { hook, cache } = await setup()
+    for (const n of ['1', '2', '3']) {
+      await act(() =>
+        hook.result.current.create.mutateAsync({ ...input, target: { ...target, url: `https://b.example/${n}` }, targetId: `t${n}` }),
+      )
+    }
+    const [c1, c2, c3] = cache().connections
+    await act(() =>
+      hook.result.current.bulk.mutateAsync({
+        description: 'done',
+        writes: [
+          { kind: 'replace', oldUri: c1!.uri, record: { ...c1!.value, connectionType: 'RELATED' } },
+          { kind: 'replace', oldUri: c2!.uri, record: { ...c2!.value, connectionType: 'RELATED' } },
+          { kind: 'delete', uri: c3!.uri },
+        ],
+      }),
+    )
+    expect(cache().connections.map((c) => c.value.connectionType)).toEqual(['RELATED', 'RELATED'])
+    expect(cache().connections.some((c) => c.pending)).toBe(false)
   })
 })

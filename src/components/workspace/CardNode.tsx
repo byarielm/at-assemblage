@@ -33,14 +33,20 @@ function Favicon({ domain }: { domain?: string }) {
 
 function CardNodeImpl({ id, data, selected }: NodeProps<CardNodeType>) {
   const { item, annotationCount, groupBadges } = data
-  // While a connection is being dragged from another card, the whole card is a drop target.
-  const isDropTarget = useConnection((c) => c.inProgress && c.fromNode.id !== id)
+  // While a connection (or a moved edge end) is dragged from another card, the whole card is a
+  // drop target. Its handle type is the opposite of the end being dragged from.
+  const dropType = useConnection((c) =>
+    c.inProgress && c.fromNode.id !== id ? (c.fromHandle.type === 'source' ? 'target' : 'source') : null,
+  )
+  const isDropTarget = dropType !== null
   const notePreview = item.notes[0] ?? (item.kind === 'NOTE' ? undefined : item.description)
 
   return (
     <div
       style={{ width: NODE_WIDTH }}
-      className={`group relative rounded-lg border bg-surface px-3 py-2.5 shadow-sm transition-shadow ${
+      className={`group relative rounded-lg border px-3 py-2.5 shadow-sm transition-shadow ${
+        item.external ? 'border-dashed bg-surface-2 opacity-85' : 'bg-surface'
+      } ${
         selected ? 'border-accent ring-2 ring-accent/40' : 'border-line hover:border-line-strong hover:shadow'
       } ${isDropTarget ? 'hover:border-accent hover:ring-2 hover:ring-accent/30' : ''}`}
     >
@@ -53,6 +59,15 @@ function CardNodeImpl({ id, data, selected }: NodeProps<CardNodeType>) {
       <div className="flex items-center gap-2 text-[11px] text-ink-3">
         <Favicon domain={item.domain} />
         <span className="truncate">{item.domain ?? (item.kind === 'NOTE' ? 'Note' : 'Card')}</span>
+        {item.external ? (
+          <span
+            className="shrink-0 rounded border border-dashed border-line-strong px-1 py-px text-[10px] font-medium uppercase tracking-wide"
+            title={item.external.label}
+          >
+            Outside
+            <span className="sr-only">: {item.external.label}</span>
+          </span>
+        ) : null}
         {annotationCount > 0 ? (
           <span
             className="ml-auto inline-flex shrink-0 items-center gap-1 rounded bg-accent-soft px-1.5 py-0.5 font-medium text-accent"
@@ -83,9 +98,9 @@ function CardNodeImpl({ id, data, selected }: NodeProps<CardNodeType>) {
         title="Drag to another card to create a connection"
         aria-label={`Start a connection from ${item.title}`}
       />
-      {isDropTarget ? (
+      {dropType ? (
         <Handle
-          type="target"
+          type={dropType}
           id="drop"
           position={Position.Left}
           className="!absolute !inset-0 !h-full !w-full !translate-none !transform-none !rounded-lg !border-0 !bg-transparent"

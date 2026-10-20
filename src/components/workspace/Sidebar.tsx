@@ -178,7 +178,7 @@ function Filters() {
 
   const domains = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const i of data.items) if (i.domain) counts.set(i.domain, (counts.get(i.domain) ?? 0) + 1)
+    for (const i of data.items) if (i.domain && !i.external) counts.set(i.domain, (counts.get(i.domain) ?? 0) + 1)
     return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12)
   }, [data.items])
 
@@ -288,6 +288,8 @@ function GraphActions() {
   const requestTidy = useUiStore((s) => s.requestTidy)
   const showEdgeLabels = useUiStore((s) => s.showEdgeLabels)
   const setShowEdgeLabels = useUiStore((s) => s.setShowEdgeLabels)
+  const showExternal = useUiStore((s) => s.showExternal)
+  const setShowExternal = useUiStore((s) => s.setShowExternal)
   const { data, refetchAll } = useWorkspace()
   const empty = data.items.length === 0
   const [reloading, setReloading] = useState(false)
@@ -329,6 +331,18 @@ function GraphActions() {
           className="h-4 w-4 accent-[var(--color-accent)]"
         />
         Always show connection labels
+      </label>
+      <label className="mt-2 flex items-start gap-2 text-[13px]">
+        <input
+          type="checkbox"
+          checked={showExternal}
+          onChange={(e) => setShowExternal(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+        />
+        <span>
+          Show connected cards outside these collections
+          <span className="block text-[12px] text-ink-3">Dashed cards at the far end of your connections.</span>
+        </span>
       </label>
     </Panel>
   )

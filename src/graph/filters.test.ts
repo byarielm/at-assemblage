@@ -55,3 +55,36 @@ describe('applyFilters', () => {
     expect([...applyFilters(data, { ...EMPTY_FILTERS, annotations: 'without' }, annotations).itemIds]).toEqual(['b', 'c'])
   })
 })
+
+describe('external items', () => {
+  const withExternal: GraphData = {
+    items: [item('a'), item('b', { groupIds: ['g2'] }), item('x', { external: { label: 'outside' }, groupIds: [] })],
+    links: [
+      { id: 'ax', sourceId: 'a', targetId: 'x', type: 'SUPPORTS' },
+      { id: 'bx', sourceId: 'b', targetId: 'x', type: 'RELATED' },
+    ],
+    warnings: [],
+  }
+
+  it('shows an external item when a visible link reaches it', () => {
+    const r = applyFilters(withExternal, EMPTY_FILTERS, new Map())
+    expect([...r.itemIds].sort()).toEqual(['a', 'b', 'x'])
+    expect(r.linkIds.size).toBe(2)
+  })
+
+  it('hides it when all of its links are filtered out', () => {
+    const r = applyFilters(withExternal, { ...EMPTY_FILTERS, linkTypes: ['OPPOSES'] }, new Map())
+    expect(r.itemIds.has('x')).toBe(false)
+  })
+
+  it('is not affected by item filters such as search', () => {
+    const r = applyFilters(withExternal, { ...EMPTY_FILTERS, search: 'a' }, new Map())
+    expect([...r.itemIds].sort()).toEqual(['a', 'x'])
+  })
+
+  it('can be switched off', () => {
+    const r = applyFilters(withExternal, EMPTY_FILTERS, new Map(), new Map(), { showExternal: false })
+    expect(r.itemIds.has('x')).toBe(false)
+    expect(r.linkIds.size).toBe(0)
+  })
+})

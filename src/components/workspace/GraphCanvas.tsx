@@ -9,10 +9,12 @@ import {
   useNodesState,
   useReactFlow,
   type Connection,
+  type EdgeChange,
+  type EdgeSelectionChange,
   type NodeChange,
-  type OnSelectionChangeParams,
+  type NodeSelectionChange,
 } from '@xyflow/react'
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { layoutGraph, NODE_HEIGHT, type Positions } from '../../graph/layout'
 import { layoutStorageKey, loadPositions, savePositions } from '../../graph/positions'
@@ -36,6 +38,16 @@ function offsetBelow(existing: Positions, fresh: Positions): Positions {
   const out: Positions = {}
   for (const [id, p] of Object.entries(fresh)) out[id] = { x: p.x + left, y: p.y + top }
   return out
+}
+
+/**
+ * Drops selected ids that were on the canvas and have now gone (deleted or filtered out). Ids
+ * never seen yet are kept: an edited connection's new URI is selected before it first renders.
+ */
+function pruneSelection(kind: 'nodes' | 'edges', before: Set<string>, now: Set<string>) {
+  const { selected, setSelected } = useUiStore.getState()
+  const kept = selected[kind].filter((id) => now.has(id) || !before.has(id))
+  if (kept.length !== selected[kind].length) setSelected({ ...selected, [kind]: kept })
 }
 
 export function GraphCanvas() {
@@ -126,7 +138,7 @@ export function GraphCanvas() {
           type: 'connection' as const,
           ariaLabel: `${style.label} connection from ${itemsById.get(link.sourceId)?.title} to ${itemsById.get(link.targetId)?.title}`,
           markerEnd: { type: MarkerType.ArrowClosed, color: colour, width: 18, height: 18 },
-          selectable: !link.pending,
+          reconnectable: !link.pending,
           data: { link, style, pending: link.pending, showLabel: showEdgeLabels, hovered: hoveredEdge === link.id },
         }
       })
@@ -137,6 +149,7 @@ export function GraphCanvas() {
         target: draft.targetId,
         type: 'connection',
         selectable: false,
+        reconnectable: false,
         markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent)', width: 18, height: 18 },
         data: { style: styleForType(draft.type), pending: true },
       })
@@ -144,20 +157,24 @@ export function GraphCanvas() {
     return edges
   }, [data.links, visible, draft, showEdgeLabels, hoveredEdge, itemsById])
 
-  // React Flow owns transient state (selection, drag); we feed it derived data and keep its selection.
+  // React Flow owns transient drag state; selection lives in the store so it survives edges being
+  // swapped (an edited connection gets a new URI) without React Flow reporting an empty selection.
   const [nodes, setNodes, onNodesChange] = useNodesState<CardNodeType>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<ConnectionEdgeType>([])
+  const prevIds = useRef({ nodes: new Set<string>(), edges: new Set<string>() })
   useEffect(() => {
-    setNodes((prev) => {
-      const selected = new Set(prev.filter((n) => n.selected).map((n) => n.id))
-      return derivedNodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n))
-    })
+    const ids = new Set(derivedNodes.map((n) => n.id))
+    pruneSelection('nodes', prevIds.current.nodes, ids)
+    prevIds.current.nodes = ids
+    const selected = new Set(useUiStore.getState().selected.nodes)
+    setNodes(derivedNodes.map((n) => (selected.has(n.id) ? { ...n, selected: true } : n)))
   }, [derivedNodes, setNodes])
   useEffect(() => {
-    setEdges((prev) => {
-      const selected = new Set(prev.filter((e) => e.selected).map((e) => e.id))
-      return derivedEdges.map((e) => (selected.has(e.id) ? { ...e, selected: true } : e))
-    })
+    const ids = new Set(derivedEdges.map((e) => e.id))
+    pruneSelection('edges', prevIds.current.edges, ids)
+    prevIds.current.edges = ids
+    const selected = new Set(useUiStore.getState().selected.edges)
+    setEdges(derivedEdges.map((e) => (selected.has(e.id) ? { ...e, selected: true } : e)))
   }, [derivedEdges, setEdges])
 
   // Programmatic selection from the inspector or search.
@@ -173,18 +190,43 @@ export function GraphCanvas() {
       const link = data.links.find((l) => l.id === id)
       if (link) focus.push(link.sourceId, link.targetId)
     }
-    if (focus.length) fitView({ nodes: focus.map((id) => ({ id })), padding: 0.4, duration: 300, maxZoom: 1.2 })
+    if (selectionRequest.focus && focus.length) fitView({ nodes: focus.map((id) => ({ id })), padding: 0.4, duration: 300, maxZoom: 1.2 })
     // Only when a new request arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectionRequest?.nonce])
 
-  const onSelectionChange = useCallback(({ nodes: ns, edges: es }: OnSelectionChangeParams) => {
-    useUiStore.getState().setSelected({ nodes: ns.map((n) => n.id), edges: es.map((e) => e.id) })
+  // Only user-driven select/deselect changes update the store. React Flow's onSelectionChange would
+  // also fire when we swap an edge's id, briefly reporting an empty selection.
+  const applySelectChanges = useCallback((kind: 'nodes' | 'edges', changes: (NodeChange | EdgeChange)[]) => {
+    const selects = changes.filter((c): c is NodeSelectionChange | EdgeSelectionChange => c.type === 'select')
+    if (selects.length === 0) return
+    const { selected, setSelected } = useUiStore.getState()
+    const ids = new Set(selected[kind])
+    for (const c of selects) {
+      if (c.selected) ids.add(c.id)
+      else ids.delete(c.id)
+    }
+    setSelected({ ...selected, [kind]: [...ids] })
   }, [])
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange<ConnectionEdgeType>[]) => {
+      onEdgesChange(changes)
+      applySelectChanges('edges', changes)
+    },
+    [onEdgesChange, applySelectChanges],
+  )
 
   const onConnect = useCallback((conn: Connection) => {
     if (!conn.source || !conn.target || conn.source === conn.target) return
     useUiStore.getState().setDraft({ sourceId: conn.source, targetId: conn.target })
+  }, [])
+
+  // Dragging an edge end onto another card proposes a move; nothing is written until confirmed.
+  const onReconnect = useCallback((oldEdge: ConnectionEdgeType, conn: Connection) => {
+    if (!conn.source || !conn.target || conn.source === conn.target) return
+    if (conn.source === oldEdge.source && conn.target === oldEdge.target) return
+    useUiStore.getState().setReconnectDraft({ linkId: oldEdge.id, sourceId: conn.source, targetId: conn.target })
   }, [])
 
   const isValidConnection = useCallback((conn: Connection | ConnectionEdgeType) => conn.source !== conn.target, [])
@@ -193,6 +235,7 @@ export function GraphCanvas() {
   const handleNodesChange = useCallback(
     (changes: NodeChange<CardNodeType>[]) => {
       onNodesChange(changes)
+      applySelectChanges('nodes', changes)
       let moved = false
       for (const c of changes) {
         if (c.type !== 'position' || c.dragging) continue
@@ -204,30 +247,39 @@ export function GraphCanvas() {
       }
       if (moved) savePositions(storageKey, useUiStore.getState().positions)
     },
-    [onNodesChange, storageKey, getNode],
+    [onNodesChange, applySelectChanges, storageKey, getNode],
   )
 
-  const onKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Delete' && e.key !== 'Backspace') return
-    if ((e.target as HTMLElement).closest('input, textarea, select')) return
-    const { selected, requestDeleteLink } = useUiStore.getState()
-    if (selected.edges.length === 1 && selected.nodes.length === 0) {
-      e.preventDefault()
-      requestDeleteLink(selected.edges[0]!)
+  // Delete/Backspace deletes selected connections (after confirmation) wherever focus is, except
+  // in text fields and while a dialog is open. Cards are never deleted by this app.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector('dialog[open]')) return
+      const { selected, requestDeleteLinks } = useUiStore.getState()
+      if (selected.edges.length > 0 && selected.nodes.length === 0) {
+        e.preventDefault()
+        requestDeleteLinks(selected.edges)
+      }
     }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   return (
-    <div className="h-full w-full" onKeyDown={onKeyDown}>
+    <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
-        onSelectionChange={onSelectionChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        reconnectRadius={14}
         isValidConnection={isValidConnection}
         onEdgeMouseEnter={(_, edge) => setHoveredEdge(edge.id)}
         onEdgeMouseLeave={() => setHoveredEdge(null)}

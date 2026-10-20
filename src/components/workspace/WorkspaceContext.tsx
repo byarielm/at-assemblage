@@ -4,12 +4,16 @@ import { applyFilters, type FilterResult } from '../../graph/filters'
 import type { GraphItem, GraphLink } from '../../graph/model'
 import { loadSelectedGroups, saveSelectedGroups } from '../../graph/positions'
 import { useWorkspaceGraph, type WorkspaceGraph } from '../../queries/useWorkspaceGraph'
+import type { StoredRecord } from '../../services/sources/records'
+import type { ConnectionRecord } from '../../services/sources/semble/types'
 import { useUiStore } from '../../state/uiStore'
 
 type WorkspaceValue = WorkspaceGraph & {
   visible: FilterResult
   itemsById: Map<string, GraphItem>
   linksById: Map<string, GraphLink>
+  /** Stored connection records by AT URI, for edits that need the original record and CID. */
+  connectionRecords: Map<string, StoredRecord<ConnectionRecord>>
 }
 
 const WorkspaceContext = createContext<WorkspaceValue | null>(null)
@@ -35,14 +39,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useSelectionPersistence(did)
   const graph = useWorkspaceGraph()
   const filters = useUiStore((s) => s.filters)
+  const showExternal = useUiStore((s) => s.showExternal)
 
   const visible = useMemo(
-    () => applyFilters(graph.data, filters, graph.annotationsByItem, graph.groupNames),
-    [graph.data, filters, graph.annotationsByItem, graph.groupNames],
+    () => applyFilters(graph.data, filters, graph.annotationsByItem, graph.groupNames, { showExternal }),
+    [graph.data, filters, graph.annotationsByItem, graph.groupNames, showExternal],
   )
   const itemsById = useMemo(() => new Map(graph.data.items.map((i) => [i.id, i])), [graph.data.items])
   const linksById = useMemo(() => new Map(graph.data.links.map((l) => [l.id, l])), [graph.data.links])
+  const connectionRecords = useMemo(
+    () => new Map((graph.connections.data?.connections ?? []).map((c) => [c.uri, c])),
+    [graph.connections.data],
+  )
 
-  const value = useMemo(() => ({ ...graph, visible, itemsById, linksById }), [graph, visible, itemsById, linksById])
+  const value = useMemo(
+    () => ({ ...graph, visible, itemsById, linksById, connectionRecords }),
+    [graph, visible, itemsById, linksById, connectionRecords],
+  )
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

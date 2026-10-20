@@ -7,6 +7,7 @@ import { ConnectionEditor } from './ConnectionEditor'
 import { DeleteConnectionDialog } from './DeleteConnectionDialog'
 import { GraphCanvas } from './GraphCanvas'
 import { Inspector } from './Inspector'
+import { ReconnectDialog } from './ReconnectDialog'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import { useWorkspace, WorkspaceProvider } from './WorkspaceContext'
@@ -89,6 +90,7 @@ export function Workspace() {
         </div>
         <ConnectionEditor />
         <DeleteConnectionDialog />
+        <ReconnectDialog />
       </WorkspaceProvider>
     </ReactFlowProvider>
   )
