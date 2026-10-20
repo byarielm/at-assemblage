@@ -309,7 +309,7 @@ export function Sidebar() {
   const hasSelection = useUiStore((s) => s.selectedGroupIds.length > 0)
   return (
     <nav aria-label="Collections and filters" className="flex min-h-0 flex-col border-r border-line bg-surface">
-      <div className="flex h-12 shrink-0 items-center border-b border-line px-4">
+      <div className="flex h-12 shrink-0 items-center border-b border-line px-4 py-2.5">
         <Logo />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
