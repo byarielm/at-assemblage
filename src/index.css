@@ -1,0 +1,111 @@
+@import 'tailwindcss';
+@import '@xyflow/react/dist/style.css';
+
+/*
+ * Design tokens. Components use the Tailwind utilities generated from these
+ * (bg-surface, text-ink, border-line, …) so dark mode is a token swap only.
+ */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --color-canvas: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8f9fb;
+  --color-line: #dfe3e8;
+  --color-line-strong: #c3c9d1;
+  --color-ink: #16191d;
+  --color-ink-2: #4a525c;
+  --color-ink-3: #6b7480;
+  --color-accent: #2f5fd0;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #e6edfb;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-success: #1d7a46;
+  --color-success-soft: #e5f4ec;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #fff4dc;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-canvas: #0f1114;
+      --color-surface: #171a1f;
+      --color-surface-2: #1d2127;
+      --color-line: #2b3038;
+      --color-line-strong: #3d444e;
+      --color-ink: #eceef1;
+      --color-ink-2: #b6bdc6;
+      --color-ink-3: #8d96a1;
+      --color-accent: #7ea2f5;
+      --color-accent-ink: #0f1114;
+      --color-accent-soft: #1d2a45;
+      --color-danger: #ff8a7f;
+      --color-danger-soft: #3a1c1a;
+      --color-success: #6fd39b;
+      --color-success-soft: #16301f;
+      --color-warn: #f2c66d;
+      --color-warn-soft: #362a12;
+    }
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-size: 14px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.4);
+  }
+}
+
+/* React Flow: align its chrome with our tokens. */
+.react-flow {
+  --xy-background-color: var(--color-canvas);
+  --xy-background-pattern-color: var(--color-line-strong);
+  --xy-minimap-background-color: var(--color-surface);
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-surface-2);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-edge-label-background-color: var(--color-surface);
+  --xy-edge-label-color: var(--color-ink);
+  --xy-handle-background-color: var(--color-accent);
+  --xy-handle-border-color: var(--color-surface);
+  --xy-selection-background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --xy-selection-border: 1px dashed var(--color-accent);
+}
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+}
+.react-flow__node:focus-visible {
+  outline: none;
+}
+.react-flow__node:focus-visible > div {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke-width: 3.5;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
