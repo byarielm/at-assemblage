@@ -1,0 +1,121 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm, useWatch } from 'react-hook-form'
+import { z } from 'zod'
+import { useCreateCollection } from '../../queries/create'
+import { describeError } from '../../services/atproto/errors'
+import { Alert } from '../ui/Alert'
+import { Button } from '../ui/Button'
+import { Dialog } from '../ui/Dialog'
+
+// Limits from the network.cosmik.collection lexicon.
+const NAME_MAX = 100
+const DESCRIPTION_MAX = 500
+
+const schema = z.object({
+  name: z.string().trim().min(1, 'Give the collection a name.').max(NAME_MAX, `Names are limited to ${NAME_MAX} characters.`),
+  description: z.string().max(DESCRIPTION_MAX, `Descriptions are limited to ${DESCRIPTION_MAX} characters.`),
+  accessType: z.enum(['CLOSED', 'OPEN']),
+})
+type FormValues = z.infer<typeof schema>
+
+const inputClass =
+  'w-full rounded-md border border-line bg-surface px-3 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none aria-[invalid=true]:border-danger'
+
+function NewCollectionForm({ onDone }: { onDone: () => void }) {
+  const create = useCreateCollection()
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', description: '', accessType: 'CLOSED' },
+  })
+  const name = useWatch({ control, name: 'name' })
+  const description = useWatch({ control, name: 'description' })
+
+  return (
+    <form noValidate className="space-y-4" onSubmit={handleSubmit((values) => create.mutate(values, { onSuccess: onDone }))}>
+      <div className="space-y-1.5">
+        <label htmlFor="collection-name" className="flex justify-between text-sm font-medium">
+          Name
+          <span className="text-[12px] font-normal text-ink-3">
+            {name.length}/{NAME_MAX}
+          </span>
+        </label>
+        <input
+          id="collection-name"
+          autoFocus
+          placeholder="Collection name"
+          aria-invalid={!!errors.name}
+          className={`${inputClass} h-9`}
+          {...register('name')}
+        />
+        {errors.name ? <p className="text-[12px] text-danger">{errors.name.message}</p> : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="collection-description" className="flex justify-between text-sm font-medium">
+          <span>
+            Description <span className="font-normal text-ink-3">(optional)</span>
+          </span>
+          <span className="text-[12px] font-normal text-ink-3">
+            {description.length}/{DESCRIPTION_MAX}
+          </span>
+        </label>
+        <textarea
+          id="collection-description"
+          rows={3}
+          placeholder="Describe what this collection is about"
+          aria-invalid={!!errors.description}
+          className={`${inputClass} resize-y py-2`}
+          {...register('description')}
+        />
+        {errors.description ? <p className="text-[12px] text-danger">{errors.description.message}</p> : null}
+      </div>
+
+      <fieldset>
+        <legend className="mb-1.5 text-sm font-medium">Collaboration</legend>
+        <div className="space-y-1.5">
+          {(
+            [
+              ['CLOSED', 'Personal', 'Only you can add'],
+              ['OPEN', 'Open', 'Anyone can add'],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <label
+              key={value}
+              className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-[13px] has-[:checked]:border-accent has-[:checked]:bg-accent-soft"
+            >
+              <input type="radio" value={value} className="accent-[var(--color-accent)]" {...register('accessType')} />
+              <span className="font-medium">{label}</span>
+              <span className="text-ink-3">— {hint}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {create.isError ? <Alert tone="error">Collection not created. {describeError(create.error).message}</Alert> : null}
+
+      <p className="text-[12px] text-ink-3">Saved to your PDS as a Semble collection; it appears in Semble too.</p>
+
+      <div className="flex justify-end gap-2 border-t border-line pt-3">
+        <Button onClick={onDone} disabled={create.isPending}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" busy={create.isPending}>
+          Create collection
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+export function NewCollectionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} title="New collection" onClose={onClose}>
+      <NewCollectionForm onDone={onClose} />
+    </Dialog>
+  )
+}

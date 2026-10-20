@@ -8,7 +8,8 @@ export default defineConfig({
   // The lazily loaded ELK layout chunk is ~1.4 MB on its own.
   build: { chunkSizeWarningLimit: 1500 },
   test: {
-    environment: 'jsdom',
+    // happy-dom, not jsdom: jsdom's separate typed-array realm breaks CID hashing in multiformats.
+    environment: 'happy-dom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,

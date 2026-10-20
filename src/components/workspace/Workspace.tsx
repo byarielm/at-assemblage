@@ -1,12 +1,15 @@
 import { ReactFlowProvider } from '@xyflow/react'
+import { useState } from 'react'
 import { describeError } from '../../services/atproto/errors'
 import { useUiStore } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button, Spinner } from '../ui/Button'
+import { Icon } from '../ui/Icon'
 import { ConnectionEditor } from './ConnectionEditor'
 import { DeleteConnectionDialog } from './DeleteConnectionDialog'
 import { GraphCanvas } from './GraphCanvas'
 import { Inspector } from './Inspector'
+import { NewCardDialog } from './NewCardDialog'
 import { ReconnectDialog } from './ReconnectDialog'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
@@ -73,6 +76,24 @@ function Warnings() {
   )
 }
 
+function AddCardButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Add a card"
+        title="Add a card"
+        onClick={() => setOpen(true)}
+        className="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg ring-1 ring-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-offset-4"
+      >
+        <Icon name="plus" size={22} strokeWidth={2.4} />
+      </button>
+      <NewCardDialog open={open} onClose={() => setOpen(false)} />
+    </>
+  )
+}
+
 export function Workspace() {
   return (
     <ReactFlowProvider>
@@ -83,6 +104,7 @@ export function Workspace() {
             <div className="relative min-h-0 flex-1">
               <GraphArea />
               <Warnings />
+              <AddCardButton />
             </div>
             <StatusBar />
           </main>

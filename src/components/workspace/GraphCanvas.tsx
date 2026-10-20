@@ -87,7 +87,15 @@ export function GraphCanvas() {
       const placed = offsetBelow(current, fresh)
       mergePositions(placed)
       savePositions(storageKey, { ...current, ...placed })
-      if (Object.keys(current).length === 0) requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
+      // A just-added card is requested for selection before it has a position: focus it now.
+      const requested = useUiStore.getState().selectionRequest?.nodes.filter((id) => placed[id]) ?? []
+      if (requested.length) {
+        requestAnimationFrame(() =>
+          fitView({ nodes: requested.map((id) => ({ id })), padding: 0.6, duration: 400, maxZoom: 1.1 }),
+        )
+      } else if (Object.keys(current).length === 0) {
+        requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
+      }
     })
     return () => {
       cancelled = true

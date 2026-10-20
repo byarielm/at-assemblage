@@ -1,6 +1,6 @@
 # Assemblage
 
-A desktop web app that turns your [Semble](https://semble.so) collections into an editable node graph. Sign in with an AT Protocol **App Password**, pick one or more of your collections, and draw typed connections between cards. Every change is written straight to your own PDS as standard Semble and Margin records, so it shows up in Semble and Margin too.
+A desktop web app that turns your [Semble](https://semble.so) collections into an editable node graph. Sign in with an AT Protocol **App Password**, pick one or more of your collections, add cards and collections, and draw typed connections between cards. Every change is written straight to your own PDS as standard Semble and Margin records, so it shows up in Semble and Margin too.
 
 There is no Assemblage server and no database. The browser talks directly to your PDS.
 
@@ -19,7 +19,7 @@ You need Node 22+. Sign in with your handle (or DID) and an App Password, which 
 | --- | --- |
 | `npm run dev` | Vite dev server |
 | `npm run build` | Typecheck and production build to `dist/` (static, host anywhere) |
-| `npm test` | Unit and integration tests (Vitest + jsdom) |
+| `npm test` | Unit and integration tests (Vitest + happy-dom) |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc -b` |
 | `npm run lex:build` | Regenerate `src/lexicons/` from `lexicons/` |
@@ -27,12 +27,13 @@ You need Node 22+. Sign in with your handle (or DID) and an App Password, which 
 
 ### Environment variables
 
-All variables are optional, and all of them point at public, unauthenticated endpoints. Copy `.env.example` to `.env` to override them.
+All variables are optional, and all of them point at public, unauthenticated endpoints. No credentials are ever sent to them. Copy `.env.example` to `.env` to override them.
 
 | Variable | Default | Used for |
 | --- | --- | --- |
 | `VITE_HANDLE_RESOLVER` | `https://public.api.bsky.app` | `com.atproto.identity.resolveHandle` (handle → DID). No credentials are sent. |
 | `VITE_PLC_DIRECTORY` | `https://plc.directory` | Resolving `did:plc` documents to find your PDS. |
+| `VITE_LINK_PREVIEW_SERVICE` | `https://cardyb.bsky.app/v1/extract` | Title and description preview when adding a card. Bluesky's link-card service receives the pasted URL. Set it to an empty string to turn previews off; you can still type a title. |
 
 ## How it works
 
@@ -56,6 +57,26 @@ These are what Semble actually stores. They differ in places from the original b
 - **Edges:** every connection with at least one end on a selected card. Endpoints are matched by AT URI or by normalised URL.
 - **Outside cards:** if the other end of a connection is not in the selection, it appears as a dashed card marked **Outside**. This covers three cases: a card in your library but in another collection, a card outside your library, or a bare URL. Outside cards can be inspected, connected to, and hidden with the "Show connected cards outside these collections" setting. Connections that touch no selected card are ignored.
 - **Annotations:** your Margin notes, matched to cards by normalised URL.
+
+### Adding cards and collections
+
+**Cards.** Click the round **+** button at the top right of the canvas. The form follows Semble's: URL, optional note, and the collections to add the card to. The collections shown on the canvas are ticked by default. A preview prefills the title, which you can edit.
+
+Everything is written in **one `applyWrites` commit**, exactly as Semble would write it:
+
+- a `URL` card, with title and description in `content.metadata`
+- an optional `NOTE` card that points at it with `parentCard`
+- one `collectionLink` per chosen collection
+
+Record keys are TIDs chosen in the browser, and record CIDs are computed locally with `@atproto/lex-cbor` (checked against the AT Protocol interop fixtures). That is what lets the note and the links reference the new card by strong ref within the same commit.
+
+If the URL is already a card in your library (compared by normalised URL), no duplicate is made. The card is only added to the collections it isn't in yet. Semble keeps one note per link per user, so an existing note is kept and the note field is locked.
+
+The new card is selected and zoomed to once it appears on the canvas. If none of the chosen collections is on the canvas, the form says so before you save.
+
+**Collections.** Click **New collection** at the top of the sidebar's collection list. Enter a name (up to 100 characters), an optional description (up to 500), and a collaboration setting. The settings are Semble's: Personal (`CLOSED`, the default) or Open (`OPEN`). The new collection is ticked straight away.
+
+**Account menu.** The button at the bottom of the sidebar shows your Bluesky display name and avatar. Both are read from the `app.bsky.actor.profile` record on your own PDS; the avatar is served by the PDS's public `getBlob` endpoint. The menu holds your handle and DID (with a copy button), the two display settings, and Sign out.
 
 ### Editing connections
 
@@ -150,8 +171,12 @@ npm test
 | `src/graph/filters.test.ts`, `src/services/sources/url.test.ts` | Search, filters, URL normalisation |
 | `src/graph/edgeSides.test.ts` | Nearest-side choice for side-by-side, stacked, diagonal and overlapping cards |
 | `src/components/auth/SignInScreen.test.tsx` | Rejecting non-App-Passwords, two-factor prompt, credential errors |
+| `src/services/sources/semble/create.test.ts` | New card, note and link records shaped like Semble's; URL validation; reusing an existing card (links only for missing collections, one note per link); a single commit whose locally computed CIDs match the PDS's; collection records and lexicon limits |
+| `src/services/linkPreview.test.ts` | Preview mapping; failure and disabled cases |
 
-The integration tests use `src/test/fakePds.ts`. This is an in-memory PDS, PLC directory and handle resolver. The real `@atproto/lex` client and `PasswordSession` run against it over `fetch`, including token expiry, revocation, cursors and injected failures.
+The integration tests use `src/test/fakePds.ts`. This is an in-memory PDS, PLC directory and handle resolver. The real `@atproto/lex` client and `PasswordSession` run against it over `fetch`, including token expiry, revocation, cursors and injected failures. Like a real PDS, it hashes each created record as received to produce its CID.
+
+The tests use happy-dom rather than jsdom. Under jsdom, typed arrays come from a separate realm, which breaks the `instanceof Uint8Array` check in multiformats when hashing for CIDs.
 
 ### Manual checks performed
 
@@ -180,6 +205,14 @@ A second run covered connection editing. It checked these against the stored rec
 - a bulk delete with the keyboard
 - hiding outside cards
 
+A third run covered creation and the account menu:
+
+- logo, display name and avatar (a content-addressed blob from the PDS)
+- adding a card with preview, note and default collection: one commit of 3 records, and the card appears selected
+- adding the same URL again: no new card, the note locked, and only the missing collection link written
+- creating a collection: name validation, Open access, and the collection ticked afterwards
+- the account menu: toggling a setting, closing with Escape (focus returns to the button), closing on an outside click, and signing out from it
+
 Scale, measured in headless Chromium with software rendering:
 
 | Cards | Load and first layout |
@@ -199,4 +232,6 @@ Panning stays usable at 300 cards: about 28 fps headless, which should be higher
 - **Positions are per browser.** Layout is not synced across devices.
 - **Favicons** are loaded directly from each card's domain, with no referrer.
 - **The App Password format check** assumes the standard `xxxx-xxxx-xxxx-xxxx` format used by the reference PDS.
-- Out of scope for the beta: OAuth, public or other users' collections, creating or editing collections and cards, network search, collaboration, offline sync, import/export, and AI features.
+- **Cards and collections can be created, but not yet edited or deleted.** The same applies to notes and to removing a card from a collection. Use Semble for those for now.
+- **Link previews use Bluesky's link-card service.** Turn them off with `VITE_LINK_PREVIEW_SERVICE=`. Without a preview, the card's title is whatever you type, or a cleaned-up URL; Semble fetches its own metadata either way.
+- Out of scope for the beta: OAuth, public or other users' collections, network search, collaboration, offline sync, import/export, and AI features.

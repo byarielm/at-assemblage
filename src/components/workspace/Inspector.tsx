@@ -152,7 +152,7 @@ function ItemDetails({ item }: { item: GraphItem }) {
       ) : null}
       <Section title={`Connections (${outgoing.length + incoming.length})`}>
         {outgoing.length + incoming.length === 0 ? (
-          <p className="text-[13px] text-ink-3">None yet. Drag from the right-hand handle of this card to another card.</p>
+          <p className="text-[13px] text-ink-3">None yet. Hover over this card and drag from one of the dots on its edges to another card.</p>
         ) : (
           <ul className="-mx-1.5">
             {outgoing.map((l) => (
@@ -214,7 +214,7 @@ export function Inspector() {
 
   return (
     <aside aria-label="Inspector" className="flex min-h-0 flex-col border-l border-line bg-surface">
-      <div className="flex h-11 shrink-0 items-center border-b border-line px-4 text-[13px] font-semibold">Inspector</div>
+      <div className="flex h-12 shrink-0 items-center border-b border-line px-4 text-[13px] font-semibold">Inspector</div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {item ? (
           <ItemDetails key={item.id} item={item} />
@@ -225,8 +225,8 @@ export function Inspector() {
         ) : (
           <>
             <div className="px-4 py-3 text-[13px] leading-relaxed text-ink-2">
-              Select a card or connection to see its details. Drag from a card&rsquo;s right-hand handle to another card
-              to connect them. Shift-click or Shift-drag to select several.
+              Select a card or connection to see its details. To connect two cards, hover over one and drag from a dot
+              on its edge to the other. Shift-click or Shift-drag to select several. Use + to add a card.
             </div>
             <Legend />
           </>

@@ -16,6 +16,9 @@ const PATHS = {
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7h.01',
   check: 'M5 12l5 5 9-10',
   arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  plus: 'M12 5v14M5 12h14',
+  chevronUp: 'M6 15l6-6 6 6',
+  copy: 'M9 9h10v10H9zM5 15V5h10',
 } as const
 
 export type IconName = keyof typeof PATHS

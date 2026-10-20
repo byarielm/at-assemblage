@@ -1,6 +1,5 @@
 import { useReactFlow } from '@xyflow/react'
 import { useMemo, useState } from 'react'
-import { useAuth, useAuthContext } from '../../auth/AuthContext'
 import { isFiltering, type AnnotationFilter } from '../../graph/filters'
 import { describeError } from '../../services/atproto/errors'
 import { CONNECTION_TYPES, styleForType } from '../../services/sources/semble/connectionTypes'
@@ -8,6 +7,9 @@ import { useUiStore } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button, IconButton, Spinner } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { Logo } from '../ui/Logo'
+import { NewCollectionDialog } from './NewCollectionDialog'
+import { UserMenu } from './UserMenu'
 import { useWorkspace } from './WorkspaceContext'
 
 function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -22,36 +24,12 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
   )
 }
 
-function Identity() {
-  const { handle, did } = useAuth()
-  const { signOut } = useAuthContext()
-  const [busy, setBusy] = useState(false)
-  return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-semibold">@{handle}</div>
-        <div className="truncate font-mono text-[10.5px] text-ink-3" title={did}>
-          {did}
-        </div>
-      </div>
-      <IconButton
-        icon="logout"
-        label="Sign out"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true)
-          await signOut()
-        }}
-      />
-    </div>
-  )
-}
-
 function CollectionPicker() {
   const { groups, collections, library } = useWorkspace()
   const selected = useUiStore((s) => s.selectedGroupIds)
   const toggleGroup = useUiStore((s) => s.toggleGroup)
   const setSelectedGroupIds = useUiStore((s) => s.setSelectedGroupIds)
+  const [creating, setCreating] = useState(false)
 
   let body: React.ReactNode
   if (collections.isPending) body = <Spinner label="Loading collections…" />
@@ -125,7 +103,11 @@ function CollectionPicker() {
         />
       }
     >
+      <Button size="sm" icon="plus" className="mb-2 w-full !justify-start" onClick={() => setCreating(true)}>
+        New collection
+      </Button>
       {body}
+      <NewCollectionDialog open={creating} onClose={() => setCreating(false)} />
     </Panel>
   )
 }
@@ -286,10 +268,6 @@ function GraphActions() {
   const { fitView } = useReactFlow()
   const selectedNodes = useUiStore((s) => s.selected.nodes)
   const requestTidy = useUiStore((s) => s.requestTidy)
-  const showEdgeLabels = useUiStore((s) => s.showEdgeLabels)
-  const setShowEdgeLabels = useUiStore((s) => s.setShowEdgeLabels)
-  const showExternal = useUiStore((s) => s.showExternal)
-  const setShowExternal = useUiStore((s) => s.setShowExternal)
   const { data, refetchAll } = useWorkspace()
   const empty = data.items.length === 0
   const [reloading, setReloading] = useState(false)
@@ -323,27 +301,6 @@ function GraphActions() {
           Reload data
         </Button>
       </div>
-      <label className="mt-3 flex items-center gap-2 text-[13px]">
-        <input
-          type="checkbox"
-          checked={showEdgeLabels}
-          onChange={(e) => setShowEdgeLabels(e.target.checked)}
-          className="h-4 w-4 accent-[var(--color-accent)]"
-        />
-        Always show connection labels
-      </label>
-      <label className="mt-2 flex items-start gap-2 text-[13px]">
-        <input
-          type="checkbox"
-          checked={showExternal}
-          onChange={(e) => setShowExternal(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
-        />
-        <span>
-          Show connected cards outside these collections
-          <span className="block text-[12px] text-ink-3">Dashed cards at the far end of your connections.</span>
-        </span>
-      </label>
     </Panel>
   )
 }
@@ -352,7 +309,9 @@ export function Sidebar() {
   const hasSelection = useUiStore((s) => s.selectedGroupIds.length > 0)
   return (
     <nav aria-label="Collections and filters" className="flex min-h-0 flex-col border-r border-line bg-surface">
-      <Identity />
+      <div className="flex h-12 shrink-0 items-center border-b border-line px-4">
+        <Logo />
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <CollectionPicker />
         {hasSelection ? (
@@ -362,6 +321,7 @@ export function Sidebar() {
           </>
         ) : null}
       </div>
+      <UserMenu />
     </nav>
   )
 }
