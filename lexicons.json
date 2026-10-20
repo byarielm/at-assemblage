@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "resolvers": [{ "type": "directory", "path": "./lexicons" }],
+  "lexicons": [
+    "at.margin.note",
+    "com.atproto.identity.resolveHandle",
+    "com.atproto.repo.applyWrites",
+    "com.atproto.repo.createRecord",
+    "com.atproto.repo.deleteRecord",
+    "com.atproto.repo.getRecord",
+    "com.atproto.repo.listRecords",
+    "com.atproto.server.createSession",
+    "com.atproto.server.deleteSession",
+    "com.atproto.server.getSession",
+    "com.atproto.server.refreshSession",
+    "network.cosmik.card",
+    "network.cosmik.collection",
+    "network.cosmik.collectionLink",
+    "network.cosmik.connection"
+  ],
+  "resolutions": {
+    "app.bsky.richtext.facet": {
+      "uri": "file://./lexicons/app/bsky/richtext/facet.json",
+      "cid": "bafyreidmfvmmnzqxgkwexzt73uopc4kiycmdogbedw4ijduxobwvla6sua"
+    },
+    "at.margin.note": {
+      "uri": "file://./lexicons/at/margin/note.json",
+      "cid": "bafyreihu3jjbuiipkxxqnjg3epnc43sgs33a5urmtvlcw4uaoodd4wo7m4"
+    },
+    "com.atproto.identity.resolveHandle": {
+      "uri": "file://./lexicons/com/atproto/identity/resolveHandle.json",
+      "cid": "bafyreihmqiz5zcvbed5ydtu7souaqkmtphzjnzrii6qesczxpixzhy52gu"
+    },
+    "com.atproto.label.defs": {
+      "uri": "file://./lexicons/com/atproto/label/defs.json",
+      "cid": "bafyreianoilzgo2njqfwuuwcv3trfsvc452wtmmfo4jgfq7ypkkysi2kdi"
+    },
+    "com.atproto.repo.applyWrites": {
+      "uri": "file://./lexicons/com/atproto/repo/applyWrites.json",
+      "cid": "bafyreigserrq6z46d7vgnxf3m2c4sgld2itq7eyapwfoc7gudfjry3h5ca"
+    },
+    "com.atproto.repo.createRecord": {
+      "uri": "file://./lexicons/com/atproto/repo/createRecord.json",
+      "cid": "bafyreian2jwdclnou5pwhoy23sous7qzkj5jqzdsnhso7aou26nwt5ziw4"
+    },
+    "com.atproto.repo.defs": {
+      "uri": "file://./lexicons/com/atproto/repo/defs.json",
+      "cid": "bafyreig6nmxec7j7ph2zx7shaljsugmndy7garsoi7td3x5bird6gllbpa"
+    },
+    "com.atproto.repo.deleteRecord": {
+      "uri": "file://./lexicons/com/atproto/repo/deleteRecord.json",
+      "cid": "bafyreigptpsppdmu6z2todwq6jbdslnx2s37rghzhieagfgtkhgw77ykh4"
+    },
+    "com.atproto.repo.getRecord": {
+      "uri": "file://./lexicons/com/atproto/repo/getRecord.json",
+      "cid": "bafyreiho5nshry2twf7p2emfsxyx22vjidufpef65c7khunteasgdxf37u"
+    },
+    "com.atproto.repo.listRecords": {
+      "uri": "file://./lexicons/com/atproto/repo/listRecords.json",
+      "cid": "bafyreiex5tdyevi7e4emkgnnngb36koqegu5zqxssnoq5xa4pln22nldau"
+    },
+    "com.atproto.repo.strongRef": {
+      "uri": "file://./lexicons/com/atproto/repo/strongRef.json",
+      "cid": "bafyreifbx7dk2lqddlzbar7n5sihedkz5b5ganyrbpcme7yyah65iv62ce"
+    },
+    "com.atproto.server.createSession": {
+      "uri": "file://./lexicons/com/atproto/server/createSession.json",
+      "cid": "bafyreig3p3umilvktnf5cdlzcfcs46pj5qcqb5tg5vqftlskxmqszhop2i"
+    },
+    "com.atproto.server.deleteSession": {
+      "uri": "file://./lexicons/com/atproto/server/deleteSession.json",
+      "cid": "bafyreihf7louq2vhkmswy6qeyrixk2fr52olshivc4mtjkm7v447oljfue"
+    },
+    "com.atproto.server.getSession": {
+      "uri": "file://./lexicons/com/atproto/server/getSession.json",
+      "cid": "bafyreiemqus6i7fomp2pkzqm5772hr52x354ni6sqrumigqga57kgicy2y"
+    },
+    "com.atproto.server.refreshSession": {
+      "uri": "file://./lexicons/com/atproto/server/refreshSession.json",
+      "cid": "bafyreidba6hc2j7iqdon24oq7xjfdko6qru3yxdgtkhrul5a5ntf5cg2fy"
+    },
+    "network.cosmik.card": {
+      "uri": "file://./lexicons/network/cosmik/card.json",
+      "cid": "bafyreiatofhuo5r3y5qf2v2x6cgn6cfxvqtzekhalrk3fbujtuuqq6swdu"
+    },
+    "network.cosmik.collection": {
+      "uri": "file://./lexicons/network/cosmik/collection.json",
+      "cid": "bafyreih3xrcbacbdjgadft6m3wsooo635oao55rscnwcqmtnawjmpk2wbq"
+    },
+    "network.cosmik.collectionLink": {
+      "uri": "file://./lexicons/network/cosmik/collectionLink.json",
+      "cid": "bafyreignfpehwuj64it4uziotbsjts5atwiqzf3eqnogtqtyr574ihscuy"
+    },
+    "network.cosmik.connection": {
+      "uri": "file://./lexicons/network/cosmik/connection.json",
+      "cid": "bafyreibkje3xnp5xseheg6367t7gm3t2wuladz3iivqjfny5nbkzxt2mey"
+    },
+    "network.cosmik.defs": {
+      "uri": "file://./lexicons/network/cosmik/defs.json",
+      "cid": "bafyreicklbzbpyeqcgv7xdxzinj4cy5ftmlk5evrzbxx3ilf2fusuil3wq"
+    }
+  }
+}
