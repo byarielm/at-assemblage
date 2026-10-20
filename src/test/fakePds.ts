@@ -1,3 +1,6 @@
+import { cidForLex } from '@atproto/lex-cbor'
+import { jsonToLex } from '@atproto/lex-json'
+
 /**
  * In-memory stand-in for a PDS, PLC directory and handle resolver, driven
  * through `fetch`. Lets tests exercise the real @atproto/lex client and
@@ -56,6 +59,8 @@ export class FakePds {
   /** Bumped by putRecord so swapRecord can detect concurrent edits. */
   private versions = new Map<string, number>()
   lastApplyWrites = 0
+  /** Public blobs by CID, served by com.atproto.sync.getBlob. */
+  readonly blobs = new Map<string, { bytes: Uint8Array; mimeType: string }>()
 
   /** Simulates an edit made elsewhere (another client) to a record. */
   touch(uri: string) {
@@ -159,6 +164,12 @@ export class FakePds {
       return json(failure.status, { error: failure.error, message: 'Injected failure' })
     }
 
+    if (url.origin === this.pds && nsid === 'com.atproto.sync.getBlob') {
+      const blob = this.blobs.get(url.searchParams.get('cid') ?? '')
+      return blob
+        ? new Response(blob.bytes as BodyInit, { status: 200, headers: { 'content-type': blob.mimeType } })
+        : json(400, { error: 'BlobNotFound', message: 'Blob not found' })
+    }
     if (url.origin === RESOLVER && nsid === 'com.atproto.identity.resolveHandle') {
       return url.searchParams.get('handle') === this.account.handle
         ? json(200, { did: this.account.did })
@@ -219,6 +230,13 @@ export class FakePds {
         const uri = this.putRecord(body.collection, body.record, body.rkey)
         return json(200, { uri, cid: TEST_CID, commit: { cid: TEST_CID, rev: '3l2222222222a' }, validationStatus: 'unknown' })
       }
+      case 'com.atproto.repo.getRecord': {
+        const collection = url.searchParams.get('collection')!
+        const rkey = url.searchParams.get('rkey')!
+        const value = this.records.get(collection)?.get(rkey)
+        if (!value) return json(400, { error: 'RecordNotFound', message: `Could not locate record` })
+        return json(200, { uri: `at://${this.account.did}/${collection}/${rkey}`, cid: this.cidOf(collection, rkey), value })
+      }
       case 'com.atproto.repo.putRecord': {
         const body = (await req.json()) as { collection: string; rkey: string; record: Record<string, unknown>; swapRecord?: string }
         if (body.swapRecord && body.swapRecord !== this.cidOf(body.collection, body.rkey)) {
@@ -239,14 +257,18 @@ export class FakePds {
             return json(400, { error: 'InvalidRequest', message: `Could not find record: ${w.rkey}` })
           }
         }
-        const results = body.writes.map((w) => {
+        const results = []
+        for (const w of body.writes) {
           if (w.$type.endsWith('#delete')) {
             this.records.get(w.collection)!.delete(w.rkey!)
-            return { $type: 'com.atproto.repo.applyWrites#deleteResult' }
+            results.push({ $type: 'com.atproto.repo.applyWrites#deleteResult' })
+            continue
           }
           const uri = this.putRecord(w.collection, w.value!, w.rkey)
-          return { $type: 'com.atproto.repo.applyWrites#createResult', uri, cid: TEST_CID }
-        })
+          // Like a real PDS: the CID of the record exactly as received.
+          const cid = (await cidForLex(jsonToLex({ $type: w.collection, ...w.value! }) as never)).toString()
+          results.push({ $type: 'com.atproto.repo.applyWrites#createResult', uri, cid })
+        }
         return json(200, { commit: { cid: TEST_CID, rev: '3l2222222222c' }, results })
       }
       case 'com.atproto.repo.deleteRecord': {

@@ -4,6 +4,12 @@ export const config = {
   handleResolver: import.meta.env.VITE_HANDLE_RESOLVER || 'https://public.api.bsky.app',
   /** PLC directory used to resolve `did:plc` documents. */
   plcDirectory: import.meta.env.VITE_PLC_DIRECTORY || 'https://plc.directory',
+  /**
+   * Link-preview service used to prefill a new card's title and description
+   * (Bluesky's link-card extractor, CORS-enabled). Set VITE_LINK_PREVIEW_SERVICE
+   * to an empty string to turn previews off.
+   */
+  linkPreviewService: import.meta.env.VITE_LINK_PREVIEW_SERVICE ?? 'https://cardyb.bsky.app/v1/extract',
   /** Where users manage App Passwords on the default (Bluesky-hosted) PDS. */
   appPasswordHelpUrl: 'https://bsky.app/settings/app-passwords',
   /** Sent as the Margin `generator` so notes are attributable to this client. */

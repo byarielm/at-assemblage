@@ -2,6 +2,7 @@
   "version": 2,
   "resolvers": [{ "type": "directory", "path": "./lexicons" }],
   "lexicons": [
+    "app.bsky.actor.profile",
     "at.margin.note",
     "com.atproto.identity.resolveHandle",
     "com.atproto.repo.applyWrites",
@@ -19,6 +20,10 @@
     "network.cosmik.connection"
   ],
   "resolutions": {
+    "app.bsky.actor.profile": {
+      "uri": "file://./lexicons/app/bsky/actor/profile.json",
+      "cid": "bafyreicxydzixifmkms7d6mndfsq6kdzcajakutdakcaqt2qvgzrscfqcm"
+    },
     "app.bsky.richtext.facet": {
       "uri": "file://./lexicons/app/bsky/richtext/facet.json",
       "cid": "bafyreidmfvmmnzqxgkwexzt73uopc4kiycmdogbedw4ijduxobwvla6sua"
