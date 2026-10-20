@@ -16,7 +16,8 @@ import {
 } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
-import { layoutGraph, NODE_HEIGHT, type Positions } from '../../graph/layout'
+import { chooseSides, sourceHandleId, targetHandleId } from '../../graph/edgeSides'
+import { layoutGraph, NODE_HEIGHT, NODE_WIDTH, type Positions } from '../../graph/layout'
 import { layoutStorageKey, loadPositions, savePositions } from '../../graph/positions'
 import { styleForType } from '../../services/sources/semble/connectionTypes'
 import { useUiStore } from '../../state/uiStore'
@@ -177,6 +178,26 @@ export function GraphCanvas() {
     setEdges(derivedEdges.map((e) => (selected.has(e.id) ? { ...e, selected: true } : e)))
   }, [derivedEdges, setEdges])
 
+  // Attach each edge to the facing sides of its two cards, from live positions so edges follow a
+  // card while it is being dragged. React Flow's own reconnect anchors then sit at the right ends.
+  const displayEdges = useMemo(() => {
+    const rects = new Map(
+      nodes.map((n) => [
+        n.id,
+        { x: n.position.x, y: n.position.y, width: n.measured?.width ?? NODE_WIDTH, height: n.measured?.height ?? NODE_HEIGHT },
+      ]),
+    )
+    return edges.map((e) => {
+      const s = rects.get(e.source)
+      const t = rects.get(e.target)
+      if (!s || !t) return e
+      const sides = chooseSides(s, t)
+      const sourceHandle = sourceHandleId(sides.source)
+      const targetHandle = targetHandleId(sides.target)
+      return e.sourceHandle === sourceHandle && e.targetHandle === targetHandle ? e : { ...e, sourceHandle, targetHandle }
+    })
+  }, [edges, nodes])
+
   // Programmatic selection from the inspector or search.
   useEffect(() => {
     if (!selectionRequest) return
@@ -272,7 +293,7 @@ export function GraphCanvas() {
     <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={displayEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={handleNodesChange}

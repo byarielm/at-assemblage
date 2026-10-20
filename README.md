@@ -91,6 +91,7 @@ lexicons.json         lexicon manifest with CIDs (committed)
 - **The PDS is the source of truth.** TanStack Query caches PDS reads. Nothing is duplicated into a local database.
 - **Graph-agnostic UI.** The canvas, filters, layout and inspector only use `GraphItem`, `GraphLink` and `Annotation` from `src/graph/model.ts`. Semble- and Margin-specific code lives in `src/services/sources/*`, and the two meet in `src/queries/useWorkspaceGraph.ts`. To add another AT Protocol app, write a new adapter and join it in there.
 - **Typed records only.** Every read goes through `client.list`/`listAll`, which validates against the generated schemas. Records that fail validation are counted and reported, never used. Every write is built with `$build` and checked with `$parse` before it is sent.
+- **Edge routing.** Every card has a handle on each side. Each edge attaches to the facing sides of its two cards: whichever axis has the larger clear gap, so side-by-side cards connect left↔right and stacked cards top↔bottom (`src/graph/edgeSides.ts`). This is recalculated from live positions, so edges follow a card while you drag it. Because edges use real handles, React Flow's drag-to-move anchors stay at the true ends.
 - **Layout.** ELK runs once for cards without a saved position, and again when you click "Tidy layout". Manual positions are saved in `localStorage`, keyed by DID and the set of selected collections. They are never written to the PDS.
 
 ### Authentication and credentials
@@ -147,6 +148,7 @@ npm test
 | `src/services/sources/margin/notes.test.ts` | Margin note building, validation, round-trip |
 | `src/queries/semble.test.tsx` | Optimistic create, rollback on failure (with retry draft), delete rollback, duplicate guard; edits that keep selection through a replace; rollback on a swap conflict; bulk retype and delete |
 | `src/graph/filters.test.ts`, `src/services/sources/url.test.ts` | Search, filters, URL normalisation |
+| `src/graph/edgeSides.test.ts` | Nearest-side choice for side-by-side, stacked, diagonal and overlapping cards |
 | `src/components/auth/SignInScreen.test.tsx` | Rejecting non-App-Passwords, two-factor prompt, credential errors |
 
 The integration tests use `src/test/fakePds.ts`. This is an in-memory PDS, PLC directory and handle resolver. The real `@atproto/lex` client and `PasswordSession` run against it over `fetch`, including token expiry, revocation, cursors and injected failures.
@@ -193,7 +195,6 @@ Panning stays usable at 300 cards: about 28 fps headless, which should be higher
 - **Own records only.** Cards that other people added to your open collections live in their repos and are not loaded. The same applies to other people's connections and Margin notes. Reading those needs an AppView.
 - **Margin notes are basic.** You can read your own notes on a card's URL and create plain `commenting` notes. Editing, highlights, selectors and bookmarks are not supported.
 - **Changing a connection's type or ends gives it a new AT URI.** This is the price of staying in sync with Semble (see [Editing connections](#editing-connections)). Anything that linked to the old URI will not follow it.
-- **Edges are drawn from the right-hand side of a card to the left-hand side of the next.** A reversed or moved connection whose source sits to the right of its target loops around until you click "Tidy layout".
 - **Handle resolution uses a public resolver.** By default this is `public.api.bsky.app`. Enter a DID to skip it entirely.
 - **Positions are per browser.** Layout is not synced across devices.
 - **Favicons** are loaded directly from each card's domain, with no referrer.

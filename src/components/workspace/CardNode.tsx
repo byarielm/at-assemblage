@@ -1,5 +1,6 @@
 import { Handle, Position, useConnection, type Node, type NodeProps } from '@xyflow/react'
 import { memo } from 'react'
+import { SIDES, sourceHandleId, targetHandleId, type Side } from '../../graph/edgeSides'
 import type { GraphItem } from '../../graph/model'
 import { NODE_WIDTH } from '../../graph/layout'
 import { Icon } from '../ui/Icon'
@@ -12,6 +13,13 @@ export type CardNodeData = {
 }
 
 export type CardNodeType = Node<CardNodeData, 'card'>
+
+const POSITION: Record<Side, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+}
 
 function Favicon({ domain }: { domain?: string }) {
   if (!domain) return <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-sm bg-line" />
@@ -50,12 +58,18 @@ function CardNodeImpl({ id, data, selected }: NodeProps<CardNodeType>) {
         selected ? 'border-accent ring-2 ring-accent/40' : 'border-line hover:border-line-strong hover:shadow'
       } ${isDropTarget ? 'hover:border-accent hover:ring-2 hover:ring-accent/30' : ''}`}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        title="Incoming connections end here"
-        aria-label={`Connection target for ${item.title}`}
-      />
+      {SIDES.map((side) => (
+        // Edge anchor only: edges pick the nearest side (see chooseSides). Drops land on the
+        // full-card overlay below, so these never need to be hit directly.
+        <Handle
+          key={`t-${side}`}
+          id={targetHandleId(side)}
+          type="target"
+          position={POSITION[side]}
+          isConnectableStart={false}
+          className="!pointer-events-none !opacity-0"
+        />
+      ))}
       <div className="flex items-center gap-2 text-[11px] text-ink-3">
         <Favicon domain={item.domain} />
         <span className="truncate">{item.domain ?? (item.kind === 'NOTE' ? 'Note' : 'Card')}</span>
@@ -92,12 +106,17 @@ function CardNodeImpl({ id, data, selected }: NodeProps<CardNodeType>) {
           ))}
         </div>
       ) : null}
-      <Handle
-        type="source"
-        position={Position.Right}
-        title="Drag to another card to create a connection"
-        aria-label={`Start a connection from ${item.title}`}
-      />
+      {SIDES.map((side) => (
+        <Handle
+          key={`s-${side}`}
+          id={sourceHandleId(side)}
+          type="source"
+          position={POSITION[side]}
+          title="Drag to another card to create a connection"
+          aria-label={`Start a connection from ${item.title} (${side})`}
+          className={`transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+        />
+      ))}
       {dropType ? (
         <Handle
           type={dropType}
