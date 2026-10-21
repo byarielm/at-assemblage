@@ -1,5 +1,6 @@
 import { Panel, useReactFlow, useStore } from '@xyflow/react'
 import { useCallback, useEffect } from 'react'
+import { FIT_PADDING, FOCUS_PADDING, MINIMAP_MIN_CANVAS_WIDTH } from '../../graph/viewport'
 import { useUiStore } from '../../state/uiStore'
 import { Icon, type IconName } from '../ui/Icon'
 
@@ -49,10 +50,10 @@ export function ViewControls() {
   const zoom = useStore((s) => s.transform[2])
   const hasSelection = useUiStore((s) => s.selected.nodes.length + s.selected.edges.length > 0)
   const showMinimap = useUiStore((s) => s.showMinimap)
-  const minimapFits = useStore((s) => s.width) >= 600
+  const minimapFits = useStore((s) => s.width) >= MINIMAP_MIN_CANVAS_WIDTH
   const setShowMinimap = useUiStore((s) => s.setShowMinimap)
 
-  const fit = useCallback(() => fitView({ padding: 0.15, duration: DURATION }), [fitView])
+  const fit = useCallback(() => fitView({ padding: FIT_PADDING, duration: DURATION }), [fitView])
   const zoomToSelection = useCallback(() => {
     const { selected } = useUiStore.getState()
     const ids = new Set(selected.nodes)
@@ -62,7 +63,7 @@ export function ViewControls() {
         ids.add(edge.target)
       }
     }
-    if (ids.size) fitView({ nodes: [...ids].map((id) => ({ id })), padding: 0.4, duration: DURATION, maxZoom: 1.2 })
+    if (ids.size) fitView({ nodes: [...ids].map((id) => ({ id })), padding: FOCUS_PADDING, duration: DURATION, maxZoom: 1.2 })
   }, [fitView, getEdges])
 
   useEffect(() => {

@@ -15,6 +15,8 @@ export const config = {
    * Set VITE_SEMBLE_API to an empty string to turn suggestions off.
    */
   sembleApi: import.meta.env.VITE_SEMBLE_API ?? 'https://api.semble.so',
+  /** Semble's web app, for "View on Semble" and collection links. */
+  sembleWeb: 'https://semble.so',
   /** Where people leave feedback about Assemblage. */
   feedbackUrl: 'https://userinput.app/s/did:plc:jwdpg464e3fd3ivtwbhzg346/3myex37dtun2b',
   /** Assemblage's Bluesky account (@assemblage.mu.social). */
