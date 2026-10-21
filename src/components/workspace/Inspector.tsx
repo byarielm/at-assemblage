@@ -216,7 +216,7 @@ export function Inspector() {
 
   return (
     <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-hidden border-l border-line bg-surface">
-      <div className="flex h-12 shrink-0 items-center border-b border-line px-4 text-[13px] font-semibold">Inspector</div>
+      <div className="flex h-[59px] shrink-0 items-center border-b border-line px-4 text-[13px] font-semibold">Inspector</div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {item ? (
           <ItemDetails key={item.id} item={item} />

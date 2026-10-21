@@ -326,7 +326,7 @@ function ExternalLinks() {
   const linkClass =
     'inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-line bg-surface px-1.5 text-[12px] font-medium text-ink hover:bg-surface-2'
   return (
-    <div className="flex shrink-0 gap-1 border-b border-line px-3 py-2">
+    <div className="flex shrink-0 gap-1 border-t border-line px-3 py-2">
       <a href={config.feedbackUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
         <Icon name="feedback" size={14} />
         Give feedback
@@ -350,14 +350,15 @@ export function Sidebar() {
       aria-label="Collections and filters"
       className="flex min-h-0 flex-col overflow-hidden border-r border-line bg-surface"
     >
-      <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-line py-2.5 pl-2 pr-4">
+      {/* 59px tall (incl. border) with 13px inset: the toggle sits exactly where its floating copy appears when collapsed. */}
+      <div className="flex h-[59px] shrink-0 items-center gap-1.5 border-b border-line pl-[13px] pr-4">
         <SidebarToggle />
-        <div className="h-full min-w-0 flex-1">
+        <div className="h-7 min-w-0 flex-1">
           <Logo />
         </div>
       </div>
-      <ExternalLinks />
       <SidebarTabs />
+      <ExternalLinks />
       <UserMenu />
     </nav>
   )
