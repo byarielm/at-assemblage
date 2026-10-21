@@ -1,26 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { isFiltering, type AnnotationFilter } from '../../graph/filters'
 import { describeError } from '../../services/atproto/errors'
 import { CONNECTION_TYPES, styleForType } from '../../services/sources/semble/connectionTypes'
-import { useUiStore } from '../../state/uiStore'
+import { config } from '../../config'
+import { useUiStore, type SidebarTab } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button, IconButton, Spinner } from '../ui/Button'
+import { BlueskyIcon } from '../ui/BlueskyIcon'
 import { Icon } from '../ui/Icon'
 import { Logo } from '../ui/Logo'
 import { NewCollectionDialog } from './NewCollectionDialog'
+import { SidebarToggle } from './SidebarToggle'
 import { UserMenu } from './UserMenu'
 import { useWorkspace } from './WorkspaceContext'
 
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-line px-4 py-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
+/** One tab's content. The tab itself names it, so there's no heading. */
+function Panel({ children }: { children: React.ReactNode }) {
+  return <div className="px-4 py-3">{children}</div>
 }
 
 function CollectionPicker() {
@@ -60,7 +56,15 @@ function CollectionPicker() {
     body = (
       <fieldset>
         <legend className="sr-only">Collections to show</legend>
-        <ul className="-mx-1.5 max-h-[38vh] space-y-px overflow-y-auto">
+        {selected.length > 0 ? (
+          <div className="mb-1 flex items-center justify-between text-[12px] text-ink-3">
+            <span>{selected.length} shown on the canvas</span>
+            <button type="button" className="text-accent hover:underline" onClick={() => setSelectedGroupIds([])}>
+              Clear
+            </button>
+          </div>
+        ) : null}
+        <ul className="-mx-1.5 space-y-px">
           {groups.map((g) => (
             <li key={g.id}>
               <label className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[13px] hover:bg-surface-2">
@@ -80,33 +84,26 @@ function CollectionPicker() {
             </li>
           ))}
         </ul>
-        {selected.length > 0 ? (
-          <button type="button" className="mt-1.5 text-[12px] text-accent hover:underline" onClick={() => setSelectedGroupIds([])}>
-            Clear selection
-          </button>
-        ) : null}
       </fieldset>
     )
 
   return (
-    <Panel
-      title="Collections"
-      action={
+    <Panel>
+      <div className="mb-2 flex items-center gap-1.5">
+        <Button size="sm" icon="plus" className="min-w-0 flex-1 !justify-start" onClick={() => setCreating(true)}>
+          New collection
+        </Button>
         <IconButton
           icon="refresh"
           label="Reload everything from your PDS"
-          className={`-my-1 h-6 w-6 ${reloading ? '[&>svg]:animate-spin' : ''}`}
+          className={`h-7 w-7 ${reloading ? '[&>svg]:animate-spin' : ''}`}
           disabled={reloading}
           onClick={async () => {
             setReloading(true)
             await refetchAll().finally(() => setReloading(false))
           }}
         />
-      }
-    >
-      <Button size="sm" icon="plus" className="mb-2 w-full !justify-start" onClick={() => setCreating(true)}>
-        New collection
-      </Button>
+      </div>
       {body}
       <NewCollectionDialog open={creating} onClose={() => setCreating(false)} />
     </Panel>
@@ -175,22 +172,18 @@ function Filters() {
   const active = isFiltering(filters)
 
   return (
-    <Panel
-      title="Search & filter"
-      action={
-        active ? (
-          <button type="button" className="text-[12px] text-accent hover:underline" onClick={resetFilters}>
-            Reset
-          </button>
-        ) : null
-      }
-    >
+    <Panel>
       <SearchBox />
       {active ? (
-        <p className="mt-1.5 text-[12px] text-ink-3" role="status">
-          Showing {visible.itemIds.size} of {data.items.length} cards, {visible.linkIds.size} of {data.links.length}{' '}
-          connections.
-        </p>
+        <div className="mt-1.5 flex items-start justify-between gap-2 text-[12px] text-ink-3">
+          <p role="status">
+            Showing {visible.itemIds.size} of {data.items.length} cards, {visible.linkIds.size} of {data.links.length}{' '}
+            connections.
+          </p>
+          <button type="button" className="shrink-0 text-accent hover:underline" onClick={resetFilters}>
+            Reset
+          </button>
+        </div>
       ) : null}
 
       {activeGroupIds.length > 1 ? (
@@ -265,21 +258,106 @@ function Filters() {
   )
 }
 
-export function Sidebar() {
+const TABS: { id: SidebarTab; label: string }[] = [
+  { id: 'collections', label: 'Collections' },
+  { id: 'filters', label: 'Filters' },
+]
+
+function SidebarTabs() {
+  const tab = useUiStore((s) => s.sidebarTab)
+  const setTab = useUiStore((s) => s.setSidebarTab)
+  const filtering = useUiStore((s) => isFiltering(s.filters))
   const hasSelection = useUiStore((s) => s.selectedGroupIds.length > 0)
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const next = TABS[(TABS.findIndex((t) => t.id === tab) + 1) % TABS.length]!.id
+    setTab(next)
+    tabRefs.current[next]?.focus()
+  }
+
   return (
-    <nav aria-label="Collections and filters" className="flex min-h-0 flex-col overflow-hidden border-r border-line bg-surface">
-      <div className="flex h-12 shrink-0 items-center border-b border-line px-4 py-2.5">
-        <Logo />
+    <>
+      <div role="tablist" aria-label="Sidebar" className="flex shrink-0 gap-1 border-b border-line px-3" onKeyDown={onKeyDown}>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            ref={(el) => {
+              tabRefs.current[t.id] = el
+            }}
+            type="button"
+            role="tab"
+            id={`sidebar-tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`sidebar-panel-${t.id}`}
+            tabIndex={tab === t.id ? 0 : -1}
+            onClick={() => setTab(t.id)}
+            className="-mb-px inline-flex h-9 items-center gap-1.5 border-b-2 border-transparent px-2 text-[13px] font-medium text-ink-3 hover:text-ink aria-selected:border-accent aria-selected:text-ink"
+          >
+            {t.label}
+            {t.id === 'filters' && filtering ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-label="(active)" title="Filters are active" />
+            ) : null}
+          </button>
+        ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <CollectionPicker />
-        {hasSelection ? (
-          <>
-            <Filters />
-          </>
-        ) : null}
+      <div
+        role="tabpanel"
+        id={`sidebar-panel-${tab}`}
+        aria-labelledby={`sidebar-tab-${tab}`}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
+        {tab === 'collections' ? (
+          <CollectionPicker />
+        ) : hasSelection ? (
+          <Filters />
+        ) : (
+          <p className="px-4 py-3 text-[13px] leading-snug text-ink-3">Choose one or more collections to search and filter their cards.</p>
+        )}
       </div>
+    </>
+  )
+}
+
+/** Small header buttons linking out: feedback form and Assemblage on Bluesky. */
+function ExternalLinks() {
+  const linkClass =
+    'inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-line bg-surface px-1.5 text-[12px] font-medium text-ink hover:bg-surface-2'
+  return (
+    <div className="flex shrink-0 gap-1 border-b border-line px-3 py-2">
+      <a href={config.feedbackUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+        <Icon name="feedback" size={14} />
+        Give feedback
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+      <a href={config.blueskyUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+        <span className="text-[#1185fe]">
+          <BlueskyIcon size={14} />
+        </span>
+        Follow on Bluesky
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    </div>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <nav
+      id="left-sidebar"
+      aria-label="Collections and filters"
+      className="flex min-h-0 flex-col overflow-hidden border-r border-line bg-surface"
+    >
+      <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-line py-2.5 pl-2 pr-4">
+        <SidebarToggle />
+        <div className="h-full min-w-0 flex-1">
+          <Logo />
+        </div>
+      </div>
+      <ExternalLinks />
+      <SidebarTabs />
       <UserMenu />
     </nav>
   )

@@ -15,6 +15,10 @@ export const config = {
    * Set VITE_SEMBLE_API to an empty string to turn suggestions off.
    */
   sembleApi: import.meta.env.VITE_SEMBLE_API ?? 'https://api.semble.so',
+  /** Where people leave feedback about Assemblage. */
+  feedbackUrl: 'https://userinput.app/s/did:plc:jwdpg464e3fd3ivtwbhzg346/3myex37dtun2b',
+  /** Assemblage's Bluesky account (@assemblage.mu.social). */
+  blueskyUrl: 'https://bsky.app/profile/assemblage.mu.social',
   /** Where users manage App Passwords on the default (Bluesky-hosted) PDS. */
   appPasswordHelpUrl: 'https://bsky.app/settings/app-passwords',
   /** Sent as the Margin `generator` so notes are attributable to this client. */
