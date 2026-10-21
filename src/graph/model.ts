@@ -23,6 +23,9 @@ export type GraphItem = {
   description?: string
   imageUrl?: string
   siteName?: string
+  /** Persistent identifiers from the page metadata, when known. */
+  doi?: string
+  isbn?: string
   /** Short free-text notes attached to the item (e.g. Semble note cards). */
   notes: string[]
   /** Ids of the groups this item belongs to (within the loaded set). */

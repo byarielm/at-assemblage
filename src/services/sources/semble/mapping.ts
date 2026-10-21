@@ -63,6 +63,8 @@ export function cardToItem(rec: StoredRecord<CardRecord>, groupIds: string[], no
     description: meta?.description ?? (note && !url ? note.text : undefined),
     imageUrl: meta?.imageUrl,
     siteName: meta?.siteName,
+    doi: meta?.doi?.trim() || undefined,
+    isbn: meta?.isbn?.trim() || undefined,
     notes,
     groupIds,
     endpoints,

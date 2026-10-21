@@ -5,6 +5,7 @@ import { CONNECTION_TYPES, styleForType } from '../../services/sources/semble/co
 import { planConnectionEdit } from '../../services/sources/semble/mapping'
 import { useUiStore } from '../../state/uiStore'
 import { Button } from '../ui/Button'
+import { TypePicker } from './TypePicker'
 import { TypeSwatch } from './TypeSwatch'
 import { useWorkspace } from './WorkspaceContext'
 
@@ -106,27 +107,16 @@ export function SelectionPanel() {
           </section>
 
           <section className="border-t border-line px-4 py-3">
-            <label htmlFor="bulk-type" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">
-              Change type
-            </label>
-            <div className="flex items-center gap-2">
-              <TypeSwatch type={type} />
-              <select
-                id="bulk-type"
-                value={type}
-                onChange={(e) => {
-                  setType(e.target.value)
-                  setConfirming(false)
-                }}
-                className="h-8 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-[13px] focus:border-accent focus:outline-none"
-              >
-                {CONNECTION_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <TypePicker
+              name="bulk-type"
+              legend="Change type to"
+          legendClassName="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"
+              value={type}
+              onChange={(v) => {
+                setType(v)
+                setConfirming(false)
+              }}
+            />
             {retype.unchanged + retype.duplicates > 0 ? (
               <p className="mt-1.5 text-[12px] text-ink-3">
                 {[

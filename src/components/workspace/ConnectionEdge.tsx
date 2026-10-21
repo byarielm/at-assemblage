@@ -2,6 +2,7 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, type Edge, type EdgeProps }
 import { memo } from 'react'
 import type { GraphLink } from '../../graph/model'
 import type { EdgeStyle } from '../../services/sources/semble/connectionTypes'
+import { Icon } from '../ui/Icon'
 
 export type ConnectionEdgeData = {
   link?: GraphLink
@@ -40,13 +41,14 @@ function ConnectionEdgeImpl(props: EdgeProps<ConnectionEdgeType>) {
       {visibleLabel ? (
         <EdgeLabelRenderer>
           <div
-            className="nodrag nopan pointer-events-none absolute rounded-full border bg-surface px-2 py-0.5 text-[11px] font-medium shadow-sm"
+            className="nodrag nopan pointer-events-none absolute inline-flex items-center gap-1 rounded-full border bg-surface px-2 py-0.5 text-[11px] font-medium shadow-sm"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               borderColor: stroke,
               color: pending ? 'var(--color-accent)' : 'var(--color-ink)',
             }}
           >
+            {pending ? null : <Icon name={style.icon} size={11} style={{ color: style.colour }} />}
             {pending ? (data.link ? 'Saving…' : 'New connection') : style.label}
             {!style.known && !pending ? <span className="ml-1 text-ink-3">(unknown type)</span> : null}
           </div>
