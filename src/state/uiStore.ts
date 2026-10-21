@@ -2,6 +2,26 @@ import { create } from 'zustand'
 import { EMPTY_FILTERS, type GraphFilters } from '../graph/filters'
 import type { Position, Positions } from '../graph/layout'
 
+export type SidebarTab = 'collections' | 'filters'
+
+const SIDEBAR_KEY = 'assemblage:sidebar-open:v1'
+
+function loadSidebarOpen(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+function saveSidebarOpen(open: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(open))
+  } catch {
+    // Storage unavailable: the choice still holds for this session.
+  }
+}
+
 export type SelectionIds = { nodes: string[]; edges: string[] }
 
 /** An edge being created: endpoints from the drag, type/note prefilled on retry. */
@@ -41,6 +61,9 @@ type UiState = {
   showEdgeLabels: boolean
   showExternal: boolean
   showMinimap: boolean
+  /** Left sidebar visibility; a per-browser preference, so it survives sign-out. */
+  sidebarOpen: boolean
+  sidebarTab: SidebarTab
   notices: Notice[]
   addCardRequest: AddCardRequest | null
 
@@ -60,6 +83,8 @@ type UiState = {
   setShowEdgeLabels: (show: boolean) => void
   setShowExternal: (show: boolean) => void
   setShowMinimap: (show: boolean) => void
+  toggleSidebar: () => void
+  setSidebarTab: (tab: SidebarTab) => void
   notify: (notice: Omit<Notice, 'id'>) => void
   dismissNotice: (id: number) => void
   openAddCard: (request?: AddCardRequest) => void
@@ -80,6 +105,7 @@ const initial = {
   showEdgeLabels: false,
   showExternal: true,
   showMinimap: true,
+  sidebarTab: 'collections' as SidebarTab,
   notices: [] as Notice[],
   addCardRequest: null as AddCardRequest | null,
 }
@@ -112,9 +138,16 @@ export const useUiStore = create<UiState>()((set) => ({
   setShowEdgeLabels: (showEdgeLabels) => set({ showEdgeLabels }),
   setShowExternal: (showExternal) => set({ showExternal }),
   setShowMinimap: (showMinimap) => set({ showMinimap }),
+  sidebarOpen: loadSidebarOpen(),
+  toggleSidebar: () =>
+    set((s) => {
+      saveSidebarOpen(!s.sidebarOpen)
+      return { sidebarOpen: !s.sidebarOpen }
+    }),
+  setSidebarTab: (sidebarTab) => set({ sidebarTab }),
   notify: (notice) => set((s) => ({ notices: [...s.notices.slice(-3), { ...notice, id: ++noticeId }] })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
   openAddCard: (request = {}) => set({ addCardRequest: request }),
   closeAddCard: () => set({ addCardRequest: null }),
-  reset: () => set(initial),
+  reset: () => set({ ...initial, sidebarOpen: loadSidebarOpen() }),
 }))

@@ -11,6 +11,7 @@ import { Inspector } from './Inspector'
 import { NewCardDialog } from './NewCardDialog'
 import { ReconnectDialog } from './ReconnectDialog'
 import { Sidebar } from './Sidebar'
+import { SidebarToggle, useSidebarShortcut } from './SidebarToggle'
 import { StatusBar } from './StatusBar'
 import { useWorkspace, WorkspaceProvider } from './WorkspaceContext'
 
@@ -58,12 +59,13 @@ function GraphArea() {
 }
 
 function Warnings() {
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const { data, graphError } = useWorkspace()
   const messages = [...data.warnings]
   if (graphError && data.items.length > 0) messages.push(`Some data failed to refresh: ${describeError(graphError).message}`)
   if (messages.length === 0) return null
   return (
-    <div className="absolute left-3 top-3 z-10 w-[360px]">
+    <div className={`absolute top-3 z-10 w-[360px] ${sidebarOpen ? 'left-3' : 'left-14'}`}>
       <Alert tone="warning">
         <ul>
           {messages.map((m) => (
@@ -94,15 +96,22 @@ function AddCardButton() {
 }
 
 export function Workspace() {
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen)
+  useSidebarShortcut()
   return (
     <ReactFlowProvider>
       <WorkspaceProvider>
         {/* Locked to the viewport: the page never scrolls; only panels scroll inside themselves. */}
-        <div className="fixed inset-0 grid grid-cols-[280px_minmax(0,1fr)_340px] grid-rows-[minmax(0,1fr)] overflow-hidden">
-          <Sidebar />
+        <div
+          className={`fixed inset-0 grid grid-rows-[minmax(0,1fr)] overflow-hidden ${
+            sidebarOpen ? 'grid-cols-[280px_minmax(0,1fr)_340px]' : 'grid-cols-[minmax(0,1fr)_340px]'
+          }`}
+        >
+          {sidebarOpen ? <Sidebar /> : null}
           <main aria-label="Graph" className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
             <div className="relative min-h-0 flex-1">
               <GraphArea />
+              {sidebarOpen ? null : <SidebarToggle floating />}
               <Warnings />
               <AddCardButton />
             </div>

@@ -8,6 +8,8 @@ const PATHS = {
   focus: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3',
   zoomIn: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4M8 11h6M11 8v6',
   zoomOut: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4M8 11h6',
+  sidebar: 'M3 4h18v16H3zM9 4v16',
+  feedback: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
   minimap: 'M3 5h18v14H3zM13 12h6v5h-6z',
   refresh: 'M20 11a8 8 0 0 0-14.9-4M4 4v4h4M4 13a8 8 0 0 0 14.9 4M20 20v-4h-4',
   note: 'M5 4h14v12l-4 4H5zM15 20v-4h4M8 9h8M8 13h5',
