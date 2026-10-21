@@ -7,6 +7,16 @@ export type SelectionIds = { nodes: string[]; edges: string[] }
 /** An edge being created: endpoints from the drag, type/note prefilled on retry. */
 export type LinkDraft = { sourceId: string; targetId: string; type?: string; note?: string }
 
+/** Opens the add-card form, optionally prefilled and followed by a connection to an existing card. */
+export type AddCardRequest = {
+  url?: string
+  title?: string
+  description?: string
+  imageUrl?: string
+  collectionIds?: string[]
+  connectTo?: { cardId: string; direction: 'outgoing' | 'incoming'; type?: string }
+}
+
 export type Notice = {
   id: number
   tone: 'error' | 'success' | 'info'
@@ -33,6 +43,7 @@ type UiState = {
   /** Bumped to request a fresh ELK layout of every visible node. */
   tidyRequest: number
   notices: Notice[]
+  addCardRequest: AddCardRequest | null
 
   setSelectedGroupIds: (ids: string[]) => void
   toggleGroup: (id: string) => void
@@ -52,6 +63,8 @@ type UiState = {
   requestTidy: () => void
   notify: (notice: Omit<Notice, 'id'>) => void
   dismissNotice: (id: number) => void
+  openAddCard: (request?: AddCardRequest) => void
+  closeAddCard: () => void
   reset: () => void
 }
 
@@ -69,6 +82,7 @@ const initial = {
   showExternal: true,
   tidyRequest: 0,
   notices: [] as Notice[],
+  addCardRequest: null as AddCardRequest | null,
 }
 
 let noticeId = 0
@@ -101,5 +115,7 @@ export const useUiStore = create<UiState>()((set) => ({
   requestTidy: () => set((s) => ({ tidyRequest: s.tidyRequest + 1 })),
   notify: (notice) => set((s) => ({ notices: [...s.notices.slice(-3), { ...notice, id: ++noticeId }] })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
+  openAddCard: (request = {}) => set({ addCardRequest: request }),
+  closeAddCard: () => set({ addCardRequest: null }),
   reset: () => set(initial),
 }))

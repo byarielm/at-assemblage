@@ -7,6 +7,7 @@ import { cleanUrl, isHttpUrl, normaliseUrl } from '../../services/sources/url'
 import { Alert } from '../ui/Alert'
 import { Button, Spinner } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
+import { useUiStore, type AddCardRequest } from '../../state/uiStore'
 import { useWorkspace } from './WorkspaceContext'
 
 const inputClass =
@@ -43,17 +44,23 @@ function useLinkPreview(url: string | null) {
   return state.url === url ? state : { url, loading: false, preview: null }
 }
 
-function NewCardForm({ onDone }: { onDone: () => void }) {
-  const { groups, activeGroupIds, collections, library } = useWorkspace()
+function NewCardForm({ request, onDone }: { request: AddCardRequest; onDone: () => void }) {
+  const { groups, activeGroupIds, collections, library, resolveItem } = useWorkspace()
   const create = useCreateCard()
-  const [rawUrl, setRawUrl] = useState('')
-  const [title, setTitle] = useState<string | null>(null)
+  const setDraft = useUiStore((s) => s.setDraft)
+  const [rawUrl, setRawUrl] = useState(request.url ?? '')
+  const [title, setTitle] = useState<string | null>(request.title ?? null)
   const [note, setNote] = useState('')
-  const [chosen, setChosen] = useState<string[]>(activeGroupIds)
+  const [chosen, setChosen] = useState<string[]>(request.collectionIds ?? activeGroupIds)
 
   const url = toUrl(rawUrl)
-  const { loading, preview } = useLinkPreview(url)
+  // A prefilled request (e.g. from a Semble suggestion) already carries metadata.
+  const prefilled = !!(request.url && (request.title || request.description)) && url === toUrl(request.url)
+  const { loading, preview } = useLinkPreview(prefilled ? null : url)
   const effectiveTitle = title ?? preview?.title ?? ''
+  const description = prefilled ? request.description : preview?.description
+  const imageUrl = prefilled ? request.imageUrl : preview?.imageUrl
+  const connectTo = request.connectTo ? resolveItem(request.connectTo.cardId) : undefined
 
   // Is this URL already a card? Then only missing collection links (and a first note) are added.
   const existing = useMemo(() => {
@@ -81,12 +88,24 @@ function NewCardForm({ onDone }: { onDone: () => void }) {
       {
         url,
         title: effectiveTitle,
-        description: preview?.description,
-        imageUrl: preview?.imageUrl,
+        description,
+        imageUrl,
         note,
         collections: chosen.flatMap((id) => (existing?.inCollections.has(id) ? [] : (collectionRecords.get(id) ?? []))),
       },
-      { onSuccess: onDone },
+      {
+        onSuccess: (plan) => {
+          onDone()
+          // Then propose the connection to the card the suggestion came from.
+          const link = request.connectTo
+          if (!link) return
+          // Stay on the card whose suggestions are being worked through.
+          useUiStore.getState().requestSelection({ nodes: [link.cardId], edges: [] }, { focus: false })
+          const [sourceId, targetId] =
+            link.direction === 'outgoing' ? [link.cardId, plan.cardRef.uri] : [plan.cardRef.uri, link.cardId]
+          setDraft({ sourceId, targetId, type: link.type })
+        },
+      },
     )
   }
 
@@ -121,8 +140,8 @@ function NewCardForm({ onDone }: { onDone: () => void }) {
 
       {url ? (
         <div className="flex gap-3 rounded-md border border-line bg-surface-2 p-3" aria-live="polite">
-          {preview?.imageUrl && isHttpUrl(preview.imageUrl) ? (
-            <img src={preview.imageUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-24 shrink-0 rounded object-cover" />
+          {imageUrl && isHttpUrl(imageUrl) ? (
+            <img src={imageUrl} alt="" referrerPolicy="no-referrer" className="h-16 w-24 shrink-0 rounded object-cover" />
           ) : null}
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12px] text-ink-3">{cleanUrl(url)}</div>
@@ -133,7 +152,7 @@ function NewCardForm({ onDone }: { onDone: () => void }) {
             ) : (
               <>
                 <div className="line-clamp-2 text-[13px] font-semibold">{effectiveTitle || cleanUrl(url)}</div>
-                {preview?.description ? <p className="mt-0.5 line-clamp-2 text-[12px] text-ink-2">{preview.description}</p> : null}
+                {description ? <p className="mt-0.5 line-clamp-2 text-[12px] text-ink-2">{description}</p> : null}
               </>
             )}
           </div>
@@ -209,11 +228,17 @@ function NewCardForm({ onDone }: { onDone: () => void }) {
         ) : null}
       </fieldset>
 
+      {connectTo ? (
+        <p className="text-[12.5px] text-ink-2">
+          After saving, you'll be asked how it connects to <strong>{connectTo.title}</strong>.
+        </p>
+      ) : null}
+
       {create.isError ? <Alert tone="error">Card not added. {describeError(create.error).message}</Alert> : null}
 
       <p className="text-[12px] leading-snug text-ink-3">
         Saved to your PDS as Semble records in one commit, so it appears in Semble too.
-        {url ? ' The preview comes from Bluesky’s link-card service.' : ''}
+        {url && !prefilled ? ' The preview comes from Bluesky’s link-card service.' : ''}
       </p>
 
       <div className="flex justify-end gap-2 border-t border-line pt-3">
@@ -221,17 +246,20 @@ function NewCardForm({ onDone }: { onDone: () => void }) {
           Cancel
         </Button>
         <Button type="submit" variant="primary" disabled={!url} busy={create.isPending}>
-          {existing ? 'Add to collections' : 'Add card'}
+          {existing ? 'Add to collections' : connectTo ? 'Add card and connect' : 'Add card'}
         </Button>
       </div>
     </form>
   )
 }
 
-export function NewCardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** The add-card dialog, driven by `addCardRequest` in the UI store. */
+export function NewCardDialog() {
+  const request = useUiStore((s) => s.addCardRequest)
+  const close = useUiStore((s) => s.closeAddCard)
   return (
-    <Dialog open={open} title="Add a card" onClose={onClose} width="w-[520px]">
-      <NewCardForm onDone={onClose} />
+    <Dialog open={!!request} title="Add a card" onClose={close} width="w-[520px]">
+      {request ? <NewCardForm request={request} onDone={close} /> : null}
     </Dialog>
   )
 }

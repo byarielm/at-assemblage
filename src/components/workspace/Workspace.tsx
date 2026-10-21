@@ -1,5 +1,4 @@
 import { ReactFlowProvider } from '@xyflow/react'
-import { useState } from 'react'
 import { describeError } from '../../services/atproto/errors'
 import { useUiStore } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
@@ -77,19 +76,19 @@ function Warnings() {
 }
 
 function AddCardButton() {
-  const [open, setOpen] = useState(false)
+  const openAddCard = useUiStore((s) => s.openAddCard)
   return (
     <>
       <button
         type="button"
         aria-label="Add a card"
         title="Add a card"
-        onClick={() => setOpen(true)}
+        onClick={() => openAddCard()}
         className="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg ring-1 ring-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-offset-4"
       >
         <Icon name="plus" size={22} strokeWidth={2.4} />
       </button>
-      <NewCardDialog open={open} onClose={() => setOpen(false)} />
+      <NewCardDialog />
     </>
   )
 }

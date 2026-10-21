@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { applyFilters, type FilterResult } from '../../graph/filters'
 import type { GraphItem, GraphLink } from '../../graph/model'
 import { loadSelectedGroups, saveSelectedGroups } from '../../graph/positions'
 import { useWorkspaceGraph, type WorkspaceGraph } from '../../queries/useWorkspaceGraph'
 import type { StoredRecord } from '../../services/sources/records'
+import { cardToItem } from '../../services/sources/semble/mapping'
 import type { ConnectionRecord } from '../../services/sources/semble/types'
 import { useUiStore } from '../../state/uiStore'
 
@@ -12,6 +13,8 @@ type WorkspaceValue = WorkspaceGraph & {
   visible: FilterResult
   itemsById: Map<string, GraphItem>
   linksById: Map<string, GraphLink>
+  /** A graph item by id, falling back to the user's library for cards not on the canvas. */
+  resolveItem: (id: string) => GraphItem | undefined
   /** Stored connection records by AT URI, for edits that need the original record and CID. */
   connectionRecords: Map<string, StoredRecord<ConnectionRecord>>
 }
@@ -52,9 +55,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [graph.connections.data],
   )
 
+  const libraryCards = useMemo(() => new Map((graph.library.data?.cards ?? []).map((c) => [c.uri, c])), [graph.library.data])
+  const resolveItem = useCallback(
+    (id: string) => {
+      const item = itemsById.get(id)
+      if (item) return item
+      const card = libraryCards.get(id)
+      return card ? cardToItem(card, [], []) : undefined
+    },
+    [itemsById, libraryCards],
+  )
+
   const value = useMemo(
-    () => ({ ...graph, visible, itemsById, linksById, connectionRecords }),
-    [graph, visible, itemsById, linksById, connectionRecords],
+    () => ({ ...graph, visible, itemsById, linksById, connectionRecords, resolveItem }),
+    [graph, visible, itemsById, linksById, connectionRecords, resolveItem],
   )
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }
