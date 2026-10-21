@@ -1,4 +1,3 @@
-import { useReactFlow } from '@xyflow/react'
 import { useMemo, useState } from 'react'
 import { isFiltering, type AnnotationFilter } from '../../graph/filters'
 import { describeError } from '../../services/atproto/errors'
@@ -25,7 +24,8 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
 }
 
 function CollectionPicker() {
-  const { groups, collections, library } = useWorkspace()
+  const { groups, collections, library, refetchAll } = useWorkspace()
+  const [reloading, setReloading] = useState(false)
   const selected = useUiStore((s) => s.selectedGroupIds)
   const toggleGroup = useUiStore((s) => s.toggleGroup)
   const setSelectedGroupIds = useUiStore((s) => s.setSelectedGroupIds)
@@ -94,11 +94,12 @@ function CollectionPicker() {
       action={
         <IconButton
           icon="refresh"
-          label="Reload collections"
-          className="-my-1 h-6 w-6"
-          onClick={() => {
-            collections.refetch()
-            library.refetch()
+          label="Reload everything from your PDS"
+          className={`-my-1 h-6 w-6 ${reloading ? '[&>svg]:animate-spin' : ''}`}
+          disabled={reloading}
+          onClick={async () => {
+            setReloading(true)
+            await refetchAll().finally(() => setReloading(false))
           }}
         />
       }
@@ -264,51 +265,10 @@ function Filters() {
   )
 }
 
-function GraphActions() {
-  const { fitView } = useReactFlow()
-  const selectedNodes = useUiStore((s) => s.selected.nodes)
-  const requestTidy = useUiStore((s) => s.requestTidy)
-  const { data, refetchAll } = useWorkspace()
-  const empty = data.items.length === 0
-  const [reloading, setReloading] = useState(false)
-
-  return (
-    <Panel title="Graph">
-      <div className="grid grid-cols-1 gap-1.5 [&>button]:justify-start">
-        <Button size="sm" icon="fit" disabled={empty} onClick={() => fitView({ padding: 0.15, duration: 300 })}>
-          Fit view
-        </Button>
-        <Button
-          size="sm"
-          icon="focus"
-          disabled={selectedNodes.length === 0}
-          onClick={() => fitView({ nodes: selectedNodes.map((id) => ({ id })), padding: 0.4, duration: 300, maxZoom: 1.2 })}
-        >
-          Zoom to selection
-        </Button>
-        <Button size="sm" icon="tidy" disabled={empty} onClick={requestTidy}>
-          Tidy layout
-        </Button>
-        <Button
-          size="sm"
-          icon="refresh"
-          busy={reloading}
-          onClick={async () => {
-            setReloading(true)
-            await refetchAll().finally(() => setReloading(false))
-          }}
-        >
-          Reload data
-        </Button>
-      </div>
-    </Panel>
-  )
-}
-
 export function Sidebar() {
   const hasSelection = useUiStore((s) => s.selectedGroupIds.length > 0)
   return (
-    <nav aria-label="Collections and filters" className="flex min-h-0 flex-col border-r border-line bg-surface">
+    <nav aria-label="Collections and filters" className="flex min-h-0 flex-col overflow-hidden border-r border-line bg-surface">
       <div className="flex h-12 shrink-0 items-center border-b border-line px-4 py-2.5">
         <Logo />
       </div>
@@ -317,7 +277,6 @@ export function Sidebar() {
         {hasSelection ? (
           <>
             <Filters />
-            <GraphActions />
           </>
         ) : null}
       </div>

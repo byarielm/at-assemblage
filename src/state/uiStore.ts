@@ -40,8 +40,7 @@ type UiState = {
   reconnectDraft: { linkId: string; sourceId: string; targetId: string } | null
   showEdgeLabels: boolean
   showExternal: boolean
-  /** Bumped to request a fresh ELK layout of every visible node. */
-  tidyRequest: number
+  showMinimap: boolean
   notices: Notice[]
   addCardRequest: AddCardRequest | null
 
@@ -60,7 +59,7 @@ type UiState = {
   setReconnectDraft: (draft: UiState['reconnectDraft']) => void
   setShowEdgeLabels: (show: boolean) => void
   setShowExternal: (show: boolean) => void
-  requestTidy: () => void
+  setShowMinimap: (show: boolean) => void
   notify: (notice: Omit<Notice, 'id'>) => void
   dismissNotice: (id: number) => void
   openAddCard: (request?: AddCardRequest) => void
@@ -80,7 +79,7 @@ const initial = {
   reconnectDraft: null as UiState['reconnectDraft'],
   showEdgeLabels: false,
   showExternal: true,
-  tidyRequest: 0,
+  showMinimap: true,
   notices: [] as Notice[],
   addCardRequest: null as AddCardRequest | null,
 }
@@ -112,7 +111,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setReconnectDraft: (reconnectDraft) => set({ reconnectDraft }),
   setShowEdgeLabels: (showEdgeLabels) => set({ showEdgeLabels }),
   setShowExternal: (showExternal) => set({ showExternal }),
-  requestTidy: () => set((s) => ({ tidyRequest: s.tidyRequest + 1 })),
+  setShowMinimap: (showMinimap) => set({ showMinimap }),
   notify: (notice) => set((s) => ({ notices: [...s.notices.slice(-3), { ...notice, id: ++noticeId }] })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
   openAddCard: (request = {}) => set({ addCardRequest: request }),

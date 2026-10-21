@@ -57,13 +57,13 @@ export function StatusBar() {
           <NoticeToast key={n.id} notice={n} />
         ))}
       </div>
-      <div className="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-[12px] text-ink-3">
+      <div className="flex h-7 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-t border-line bg-surface px-3 text-[12px] text-ink-3">
         <span>
           {visible.itemIds.size - external} cards
           {external ? ` · ${external} outside` : ''} · {visible.linkIds.size} connections
         </span>
         {saving ? <span className="text-accent">Saving…</span> : fetching ? <span>Syncing with your PDS…</span> : <span>Up to date</span>}
-        <span className="ml-auto">Positions are saved in this browser only</span>
+        <span className="ml-auto min-w-0 truncate">Positions are saved in this browser only</span>
       </div>
     </>
   )
