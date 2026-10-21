@@ -22,6 +22,8 @@ const PATHS = {
   arrowRight: 'M5 12h14M13 6l6 6-6 6',
   plus: 'M12 5v14M5 12h14',
   chevronUp: 'M6 15l6-6 6 6',
+  chevronRight: 'M9 6l6 6-6 6',
+  pencil: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
   copy: 'M9 9h10v10H9zM5 15V5h10',
   swap: 'M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4',
   sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',

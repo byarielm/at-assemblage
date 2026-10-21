@@ -7,6 +7,7 @@ import { Icon } from '../ui/Icon'
 import { ConnectionEditor } from './ConnectionEditor'
 import { DeleteConnectionDialog } from './DeleteConnectionDialog'
 import { GraphCanvas } from './GraphCanvas'
+import { INSPECTOR_RESERVED } from '../../graph/viewport'
 import { Inspector } from './Inspector'
 import { NewCardDialog } from './NewCardDialog'
 import { ReconnectDialog } from './ReconnectDialog'
@@ -86,7 +87,8 @@ function AddCardButton() {
         aria-label="Add a card"
         title="Add a card"
         onClick={() => openAddCard()}
-        className="absolute right-4 top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg ring-1 ring-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-offset-4"
+        style={{ right: INSPECTOR_RESERVED }}
+        className="absolute top-4 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg ring-1 ring-black/5 transition hover:scale-105 hover:opacity-95 focus-visible:outline-offset-4"
       >
         <Icon name="plus" size={22} strokeWidth={2.4} />
       </button>
@@ -104,7 +106,7 @@ export function Workspace() {
         {/* Locked to the viewport: the page never scrolls; only panels scroll inside themselves. */}
         <div
           className={`fixed inset-0 grid grid-rows-[minmax(0,1fr)] overflow-hidden ${
-            sidebarOpen ? 'grid-cols-[280px_minmax(0,1fr)_340px]' : 'grid-cols-[minmax(0,1fr)_340px]'
+            sidebarOpen ? 'grid-cols-[280px_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)]'
           }`}
         >
           {sidebarOpen ? <Sidebar /> : null}
@@ -114,10 +116,10 @@ export function Workspace() {
               {sidebarOpen ? null : <SidebarToggle floating />}
               <Warnings />
               <AddCardButton />
+              <Inspector />
             </div>
             <StatusBar />
           </main>
-          <Inspector />
         </div>
         <ConnectionEditor />
         <DeleteConnectionDialog />

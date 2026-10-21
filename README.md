@@ -108,7 +108,7 @@ Select a card and the inspector shows **Suggestions from Semble**, built only fr
 | **Connected by others** | `network.cosmik.connection.getForUrl` (both directions) | Pages other people connected to or from this page, with their relationship type and direction. Several people making the same connection merge into one entry ("by @alice and 2 others"), ranked by how many made it. Your own connections are left out, because they're already on the canvas. |
 | **Similar pages** | `network.cosmik.search.getSimilarUrls` | Semantically similar pages across Semble, minus the page itself and anything already listed above. |
 
-Suggestions sit at the bottom of the inspector, below Margin notes. Each is a small card showing:
+Suggestions are the last section of the inspector. Each is a small card showing:
 
 - a 56px thumbnail: Semble's image for the page, else the site's favicon on a tinted tile, else the domain's initial
 - the title, the site, and how many Semble libraries hold it
@@ -182,6 +182,19 @@ lexicons.json         lexicon manifest with CIDs (committed)
 - **Edge routing.** Every card has a handle on each side. Each edge attaches to the facing sides of its two cards: whichever axis has the larger clear gap, so side-by-side cards connect left↔right and stacked cards top↔bottom (`src/graph/edgeSides.ts`). This is recalculated from live positions, so edges follow a card while you drag it. Because edges use real handles, React Flow's drag-to-move anchors stay at the true ends.
 - **Layout.** ELK places cards that have no saved position yet; after that, cards stay where you put them. Manual positions are saved in `localStorage`, keyed by DID and the set of selected collections. They are never written to the PDS. A "Tidy layout" command was removed because its results weren't good enough; see [#7](https://github.com/renderghost/at-assemblage/issues/7).
 - **Left sidebar.** **Collections** and **Filters** are two tabs, so each gets the full height. Two links stay pinned above the account button: **Give feedback** (Assemblage's feedback form on userinput.app) and **Follow on Bluesky** (@assemblage.mu.social). In the tabs, a dot on the Filters tab shows when filters are active. The button left of the logo hides the sidebar (also `⌘B` / `Ctrl+B`, from anywhere except an open dialog). While it's hidden, the same button floats at the canvas's top left in exactly the same spot, matching the view controls at the bottom left. This browser remembers whether the sidebar is shown.
+- **Inspector.** A stack of cards floating over the canvas's right edge, 320px wide and 16px in from the top and right. Each section collapses on its own, and several can be open at once; this browser remembers which are open. The stack scrolls when it's taller than the canvas, and the gaps between cards pass clicks through to the canvas. Fit view, zoom to selection, the + button, the minimap and notifications all keep clear of it. For a selected card, the sections are:
+
+  | Section | Contents |
+  | --- | --- |
+  | **Details** | Thumbnail at 1200×630, site, title, **Edit**, **View on Semble** (`semble.so/url/<url>`), description and the page link |
+  | **Notes (n)** | **Semble**: your note on the card, which you can add or edit. **Margin**: your Margin notes, plus a form to add one. |
+  | **Collections (n)** | Every collection the card is in, linking to it on Semble |
+  | **Connections (n)** | Grouped by type, both directions; click one to select it |
+  | **Suggestions (n)** | Grouped by category (Connected by others, Similar pages) |
+
+  **Edit** edits your Semble note. Semble's indexer applies edits to NOTE cards made by other apps but ignores edits to URL cards, so the note is the one part of a card we can change and have it show in Semble. Notes are updated in place, and the write is refused if the note changed elsewhere.
+
+  With a connection selected, the inspector shows a single **Connection** section; with several things selected, a **Selection** section; with nothing selected, a collapsed **Connection types** legend.
 - **App shell.** The app is fixed to the window: the page itself never scrolls, and the sidebar, canvas and inspector each scroll inside themselves. On a narrow window the sidebars keep their width and the canvas shrinks.
 - **View controls.** A toolbar floats at the bottom left of the canvas:
 
@@ -254,6 +267,7 @@ npm test
 | `src/graph/edgeSides.test.ts` | Nearest-side choice for side-by-side, stacked, diagonal and overlapping cards |
 | `src/components/auth/SignInScreen.test.tsx` | Rejecting non-App-Passwords, two-factor prompt, credential errors |
 | `src/services/sources/semble/create.test.ts` | New card, note and link records shaped like Semble's; URL validation; reusing an existing card (links only for missing collections, one note per link); a single commit whose locally computed CIDs match the PDS's; collection records and lexicon limits |
+| `src/services/sources/semble/notes.test.ts` | Adding a Semble note linked to a card, editing it in place, refusing an edit when the note changed elsewhere |
 | `src/services/linkPreview.test.ts` | Preview mapping; failure and disabled cases |
 | `src/services/sources/semble/appview.test.ts` | Semble API calls (plain GET, no credentials), lenient response validation, error mapping |
 | `src/services/sources/semble/recommendType.test.ts` | Same-resource signals (DOI, ISBN, archive copies, cosmetic URL differences) and staying silent for different pages. Consensus thresholds (2+ people, majority, same direction, one vote per person, own connections and unknown types excluded). Same-resource takes priority. |

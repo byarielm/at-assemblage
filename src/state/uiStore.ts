@@ -4,6 +4,29 @@ import type { Position, Positions } from '../graph/layout'
 
 export type SidebarTab = 'collections' | 'filters'
 
+export type InspectorSection = 'details' | 'notes' | 'collections' | 'connections' | 'suggestions' | 'connection' | 'selection' | 'legend'
+
+const SECTIONS_KEY = 'assemblage:inspector-sections:v1'
+const DEFAULT_SECTIONS: Record<InspectorSection, boolean> = {
+  details: true,
+  notes: false,
+  collections: false,
+  connections: true,
+  suggestions: false,
+  connection: true,
+  selection: true,
+  legend: false,
+}
+
+function loadSections(): Record<InspectorSection, boolean> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Partial<Record<InspectorSection, boolean>>
+    return { ...DEFAULT_SECTIONS, ...saved }
+  } catch {
+    return { ...DEFAULT_SECTIONS }
+  }
+}
+
 const SIDEBAR_KEY = 'assemblage:sidebar-open:v1'
 
 function loadSidebarOpen(): boolean {
@@ -64,6 +87,8 @@ type UiState = {
   /** Left sidebar visibility; a per-browser preference, so it survives sign-out. */
   sidebarOpen: boolean
   sidebarTab: SidebarTab
+  /** Which inspector sections are expanded; several can be open. Remembered per browser. */
+  inspectorSections: Record<InspectorSection, boolean>
   notices: Notice[]
   addCardRequest: AddCardRequest | null
 
@@ -85,6 +110,7 @@ type UiState = {
   setShowMinimap: (show: boolean) => void
   toggleSidebar: () => void
   setSidebarTab: (tab: SidebarTab) => void
+  setInspectorSection: (section: InspectorSection, open: boolean) => void
   notify: (notice: Omit<Notice, 'id'>) => void
   dismissNotice: (id: number) => void
   openAddCard: (request?: AddCardRequest) => void
@@ -145,9 +171,20 @@ export const useUiStore = create<UiState>()((set) => ({
       return { sidebarOpen: !s.sidebarOpen }
     }),
   setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+  inspectorSections: loadSections(),
+  setInspectorSection: (section, open) =>
+    set((s) => {
+      const inspectorSections = { ...s.inspectorSections, [section]: open }
+      try {
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(inspectorSections))
+      } catch {
+        // Storage unavailable: the choice holds for this session.
+      }
+      return { inspectorSections }
+    }),
   notify: (notice) => set((s) => ({ notices: [...s.notices.slice(-3), { ...notice, id: ++noticeId }] })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
   openAddCard: (request = {}) => set({ addCardRequest: request }),
   closeAddCard: () => set({ addCardRequest: null }),
-  reset: () => set({ ...initial, sidebarOpen: loadSidebarOpen() }),
+  reset: () => set({ ...initial, sidebarOpen: loadSidebarOpen(), inspectorSections: loadSections() }),
 }))

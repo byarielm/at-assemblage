@@ -7,6 +7,7 @@ import { cleanUrl, domainOf, isHttpUrl } from '../../services/sources/url'
 import { useUiStore } from '../../state/uiStore'
 import { Button, Spinner } from '../ui/Button'
 import { Icon } from '../ui/Icon'
+import { InspectorGroup, InspectorSection } from './InspectorSection'
 import { TypeSwatch } from './TypeSwatch'
 
 const PREVIEW = 5
@@ -122,21 +123,24 @@ function Group({ title, hint, items, card }: { title: string; hint: string; item
   if (items.length === 0) return null
   const shown = expanded ? items : items.slice(0, PREVIEW)
   return (
-    <div className="mt-3 first:mt-0">
-      <h4 className="text-[12px] font-semibold text-ink-2" title={hint}>
-        {title} <span className="font-normal text-ink-3">({items.length})</span>
-      </h4>
-      <ul className="mt-1.5 space-y-2">
+    <InspectorGroup
+      title={
+        <span title={hint}>
+          {title} <span className="font-normal text-ink-3">({items.length})</span>
+        </span>
+      }
+    >
+      <ul className="space-y-2">
         {shown.map((s) => (
           <SuggestionRow key={s.key} suggestion={s} card={card} />
         ))}
       </ul>
       {items.length > PREVIEW ? (
-        <button type="button" className="text-[12px] text-accent hover:underline" onClick={() => setExpanded((e) => !e)}>
+        <button type="button" className="text-[14px] text-accent hover:underline" onClick={() => setExpanded((e) => !e)}>
           {expanded ? 'Show fewer' : `Show ${items.length - PREVIEW} more`}
         </button>
       ) : null}
-    </div>
+    </InspectorGroup>
   )
 }
 
@@ -149,38 +153,50 @@ export function SuggestionsSection({ card }: { card: GraphItem & { url: string }
   const { groups, isLoading, error, partial, refetch, enabled } = useSuggestions(card.url)
   if (!enabled) return null
 
-  const empty = groups && groups.connected.length === 0 && groups.similar.length === 0
+  const count = groups ? groups.connected.length + groups.similar.length : isLoading ? null : 0
+  const empty = groups && count === 0
   return (
-    <section className="border-t border-line px-4 py-3" aria-labelledby="suggestions-heading" aria-busy={isLoading}>
-      <h3 id="suggestions-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
-        Suggestions from Semble
-      </h3>
-      {isLoading ? (
-        <p className="text-[13px] text-ink-3">
-          <Spinner label="Asking Semble…" />
+    <InspectorSection id="suggestions" title="Suggestions" count={count}>
+      <div aria-busy={isLoading}>
+        {isLoading ? (
+          <InspectorGroup>
+            <p className="text-ink-3">
+              <Spinner label="Asking Semble…" />
+            </p>
+          </InspectorGroup>
+        ) : error ? (
+          <InspectorGroup>
+            <div className="flex items-center gap-2 text-ink-3">
+              <span>{error}</span>
+              <button type="button" className="text-accent hover:underline" onClick={() => refetch()}>
+                Retry
+              </button>
+            </div>
+          </InspectorGroup>
+        ) : empty ? (
+          <InspectorGroup>
+            <p className="text-ink-3">Nobody on Semble has connected this page yet, and there are no similar pages.</p>
+          </InspectorGroup>
+        ) : groups ? (
+          <>
+            <Group
+              title="Connected by others"
+              hint="Pages other Semble users connected to or from this page"
+              items={groups.connected}
+              card={card}
+            />
+            <Group title="Similar pages" hint="Pages Semble finds similar to this one" items={groups.similar} card={card} />
+            {partial ? (
+              <InspectorGroup>
+                <p className="text-[12px] text-warn">Some suggestions could not be loaded.</p>
+              </InspectorGroup>
+            ) : null}
+          </>
+        ) : null}
+        <p className="border-t border-line px-4 py-2 text-[11.5px] leading-snug text-ink-3">
+          From Semble's public data. This card's URL is sent to Semble to look it up.
         </p>
-      ) : error ? (
-        <div className="flex items-center gap-2 text-[13px] text-ink-3">
-          <span>{error}</span>
-          <button type="button" className="text-accent hover:underline" onClick={() => refetch()}>
-            Retry
-          </button>
-        </div>
-      ) : empty ? (
-        <p className="text-[13px] text-ink-3">Nobody on Semble has connected this page yet, and there are no similar pages.</p>
-      ) : groups ? (
-        <>
-          <Group
-            title="Connected by others"
-            hint="Pages other Semble users connected to or from this page"
-            items={groups.connected}
-            card={card}
-          />
-          <Group title="Similar pages" hint="Pages Semble finds similar to this one" items={groups.similar} card={card} />
-          {partial ? <p className="mt-2 text-[12px] text-warn">Some suggestions could not be loaded.</p> : null}
-        </>
-      ) : null}
-      <p className="mt-2 text-[11px] leading-snug text-ink-3">From Semble's public data. This card's URL is sent to Semble to look it up.</p>
-    </section>
+      </div>
+    </InspectorSection>
   )
 }

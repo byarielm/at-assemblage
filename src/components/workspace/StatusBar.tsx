@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { INSPECTOR_RESERVED } from '../../graph/viewport'
 import { useUiStore, type Notice } from '../../state/uiStore'
 import { Button, IconButton } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -52,10 +53,16 @@ export function StatusBar() {
 
   return (
     <>
-      <div className="pointer-events-none absolute left-1/2 top-3 z-10 flex w-[520px] max-w-[calc(100%-32px)] -translate-x-1/2 flex-col gap-2">
-        {notices.map((n) => (
-          <NoticeToast key={n.id} notice={n} />
-        ))}
+      {/* Centred in the canvas area left of the floating inspector. */}
+      <div
+        className="pointer-events-none absolute left-0 top-3 z-30 flex justify-center px-4"
+        style={{ right: INSPECTOR_RESERVED }}
+      >
+        <div className="flex w-[520px] max-w-full flex-col gap-2">
+          {notices.map((n) => (
+            <NoticeToast key={n.id} notice={n} />
+          ))}
+        </div>
       </div>
       <div className="flex h-7 shrink-0 items-center gap-4 overflow-hidden whitespace-nowrap border-t border-line bg-surface px-3 text-[12px] text-ink-3">
         <span>

@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { chooseSides, sourceHandleId, targetHandleId } from '../../graph/edgeSides'
+import { FIT_PADDING, FOCUS_PADDING, INSPECTOR_RESERVED, MINIMAP_MIN_CANVAS_WIDTH } from '../../graph/viewport'
 import { layoutGraph, NODE_HEIGHT, NODE_WIDTH, type Positions } from '../../graph/layout'
 import { layoutStorageKey, loadPositions, savePositions } from '../../graph/positions'
 import { styleForType } from '../../services/sources/semble/connectionTypes'
@@ -51,8 +52,6 @@ function pruneSelection(kind: 'nodes' | 'edges', before: Set<string>, now: Set<s
   const kept = selected[kind].filter((id) => now.has(id) || !before.has(id))
   if (kept.length !== selected[kind].length) setSelected({ ...selected, [kind]: kept })
 }
-
-const MINIMAP_MIN_CANVAS_WIDTH = 600
 
 export function GraphCanvas() {
   const canvasWidth = useStore((s) => s.width)
@@ -96,10 +95,10 @@ export function GraphCanvas() {
       const requested = useUiStore.getState().selectionRequest?.nodes.filter((id) => placed[id]) ?? []
       if (requested.length) {
         requestAnimationFrame(() =>
-          fitView({ nodes: requested.map((id) => ({ id })), padding: 0.6, duration: 400, maxZoom: 1.1 }),
+          fitView({ nodes: requested.map((id) => ({ id })), padding: FOCUS_PADDING, duration: 400, maxZoom: 1.1 }),
         )
       } else if (Object.keys(current).length === 0) {
-        requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
+        requestAnimationFrame(() => fitView({ padding: FIT_PADDING, duration: 300 }))
       }
     })
     return () => {
@@ -209,7 +208,7 @@ export function GraphCanvas() {
       const link = data.links.find((l) => l.id === id)
       if (link) focus.push(link.sourceId, link.targetId)
     }
-    if (selectionRequest.focus && focus.length) fitView({ nodes: focus.map((id) => ({ id })), padding: 0.4, duration: 300, maxZoom: 1.2 })
+    if (selectionRequest.focus && focus.length) fitView({ nodes: focus.map((id) => ({ id })), padding: FOCUS_PADDING, duration: 300, maxZoom: 1.2 })
     // Only when a new request arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectionRequest?.nonce])
@@ -318,6 +317,8 @@ export function GraphCanvas() {
             pannable
             zoomable
             position="bottom-right"
+            // Sits left of the floating inspector.
+            style={{ marginRight: INSPECTOR_RESERVED }}
             ariaLabel="Minimap"
             nodeStrokeWidth={2}
             nodeColor="var(--color-line-strong)"
