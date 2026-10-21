@@ -33,6 +33,7 @@ All variables are optional, and all of them point at public, unauthenticated end
 | --- | --- | --- |
 | `VITE_HANDLE_RESOLVER` | `https://public.api.bsky.app` | `com.atproto.identity.resolveHandle` (handle → DID). No credentials are sent. |
 | `VITE_PLC_DIRECTORY` | `https://plc.directory` | Resolving `did:plc` documents to find your PDS. |
+| `VITE_SEMBLE_API` | `https://api.semble.so` | Suggestions in the card inspector, from Semble's public API. The selected card's URL is sent. Set it to an empty string to turn suggestions off. |
 | `VITE_LINK_PREVIEW_SERVICE` | `https://cardyb.bsky.app/v1/extract` | Title and description preview when adding a card. Bluesky's link-card service receives the pasted URL. Set it to an empty string to turn previews off; you can still type a title. |
 
 ## How it works
@@ -77,6 +78,27 @@ The new card is selected and zoomed to once it appears on the canvas. If none of
 **Collections.** Click **New collection** at the top of the sidebar's collection list. Enter a name (up to 100 characters), an optional description (up to 500), and a collaboration setting. The settings are Semble's: Personal (`CLOSED`, the default) or Open (`OPEN`). The new collection is ticked straight away.
 
 **Account menu.** The button at the bottom of the sidebar shows your Bluesky display name and avatar. Both are read from the `app.bsky.actor.profile` record on your own PDS; the avatar is served by the PDS's public `getBlob` endpoint. The menu holds your handle and DID (with a copy button), the two display settings, and Sign out.
+
+### Suggestions from Semble
+
+Select a card and the inspector shows **Suggestions from Semble**, built only from Semble's public AppView API. These `/xrpc/network.cosmik.*` endpoints accept requests from any origin and need no login. The browser sends a plain `GET` with no cookies or auth headers, so the only thing sent is the card's URL, which is already public in your PDS.
+
+| Group | Endpoint | What it shows |
+| --- | --- | --- |
+| **Connected by others** | `network.cosmik.connection.getForUrl` (both directions) | Pages other people connected to or from this page, with their relationship type and direction. Several people making the same connection merge into one entry ("by @alice and 2 others"), ranked by how many made it. Your own connections are left out, because they're already on the canvas. |
+| **Similar pages** | `network.cosmik.search.getSimilarUrls` | Semantically similar pages across Semble, minus the page itself and anything already listed above. |
+
+Each entry shows the site and how many Semble libraries hold it, plus one action:
+
+- **Connect** if the page is already one of your cards, even one in a collection that isn't on the canvas. It opens the connection editor, prefilled with the other person's relationship type and direction.
+- **Add** if it isn't. It opens the add-card form with Semble's title and description, and the selected card's collections ticked. After saving, the connection editor opens with the type prefilled. The selected card stays selected, so you can keep working through its list.
+- **Connected** once you have that connection (same direction and type for "Connected by others"; any connection for "Similar pages").
+
+Results are cached per URL for the session. If either source fails, the other's results still show. If both fail, a Retry link appears.
+
+"In my library" is worked out locally from your PDS data, because anonymous calls to Semble don't return `urlInLibrary`.
+
+Semble's other public endpoints are next: collections containing a URL, other people's notes on it, and dismissals ([#4](https://github.com/renderghost/at-assemblage/issues/4)). Reading pages for key phrases and links is stashed in [#3](https://github.com/renderghost/at-assemblage/issues/3).
 
 ### Editing connections
 
@@ -173,6 +195,8 @@ npm test
 | `src/components/auth/SignInScreen.test.tsx` | Rejecting non-App-Passwords, two-factor prompt, credential errors |
 | `src/services/sources/semble/create.test.ts` | New card, note and link records shaped like Semble's; URL validation; reusing an existing card (links only for missing collections, one note per link); a single commit whose locally computed CIDs match the PDS's; collection records and lexicon limits |
 | `src/services/linkPreview.test.ts` | Preview mapping; failure and disabled cases |
+| `src/services/sources/semble/appview.test.ts` | Semble API calls (plain GET, no credentials), lenient response validation, error mapping |
+| `src/services/sources/semble/suggestions.test.ts` | Direction from either end (including `www.` variants), skipping your own connections, merging curators and ranking, flagging pages in your library and connections already made, de-duplicating similar pages |
 
 The integration tests use `src/test/fakePds.ts`. This is an in-memory PDS, PLC directory and handle resolver. The real `@atproto/lex` client and `PasswordSession` run against it over `fetch`, including token expiry, revocation, cursors and injected failures. Like a real PDS, it hashes each created record as received to produce its CID.
 
@@ -212,6 +236,15 @@ A third run covered creation and the account menu:
 - adding the same URL again: no new card, the note locked, and only the missing collection link written
 - creating a collection: name validation, Open access, and the collection ticked afterwards
 - the account menu: toggling a setting, closing with Escape (focus returns to the button), closing on an outside click, and signing out from it
+
+A fourth run covered suggestions, with Semble's API mocked:
+
+- both groups, with merged curators, directions, saved-by counts, and your own connection excluded
+- only the two endpoints called, as plain GETs with no auth or cookies
+- Connect to a library card in another collection: the editor opened with Leads to prefilled, and the record was saved
+- Add then connect: the form was prefilled with no link-preview call, the card's collection was ticked, then Supports was prefilled and saved
+- rows switching to **Connected**
+- Semble returning 503: the error and Retry showed, and Retry recovered
 
 Scale, measured in headless Chromium with software rendering:
 

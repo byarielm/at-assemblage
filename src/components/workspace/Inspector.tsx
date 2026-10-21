@@ -9,6 +9,7 @@ import { Alert } from '../ui/Alert'
 import { Button } from '../ui/Button'
 import { ConnectionEditPanel } from './ConnectionEditPanel'
 import { SelectionPanel } from './SelectionPanel'
+import { SuggestionsSection } from './SuggestionsSection'
 import { TypeSwatch } from './TypeSwatch'
 import { useWorkspace } from './WorkspaceContext'
 
@@ -164,6 +165,7 @@ function ItemDetails({ item }: { item: GraphItem }) {
           </ul>
         )}
       </Section>
+      {item.url && isHttpUrl(item.url) ? <SuggestionsSection key={item.url} card={item as GraphItem & { url: string }} /> : null}
       <Section title={`Margin notes (${annotations.length})`}>
         {margin.isError ? <Alert tone="warning">Could not load Margin notes. {describeError(margin.error).message}</Alert> : null}
         {annotations.length > 0 ? (

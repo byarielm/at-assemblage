@@ -154,9 +154,9 @@ function EditorForm({ draft, source, target }: { draft: LinkDraft; source: Graph
 export function ConnectionEditor() {
   const draft = useUiStore((s) => s.draft)
   const setDraft = useUiStore((s) => s.setDraft)
-  const { itemsById } = useWorkspace()
-  const source = draft ? itemsById.get(draft.sourceId) : undefined
-  const target = draft ? itemsById.get(draft.targetId) : undefined
+  const { resolveItem } = useWorkspace()
+  const source = draft ? resolveItem(draft.sourceId) : undefined
+  const target = draft ? resolveItem(draft.targetId) : undefined
   const open = !!(draft && source && target)
 
   return (

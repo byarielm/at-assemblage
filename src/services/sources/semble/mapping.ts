@@ -46,7 +46,7 @@ function firstLine(text: string, max = 80): string {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line
 }
 
-function cardToItem(rec: StoredRecord<CardRecord>, groupIds: string[], notes: string[]): GraphItem {
+export function cardToItem(rec: StoredRecord<CardRecord>, groupIds: string[], notes: string[]): GraphItem {
   const card = rec.value
   const content = urlContent(card)
   const note = noteContent(card)

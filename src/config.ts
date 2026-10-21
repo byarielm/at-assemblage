@@ -10,6 +10,11 @@ export const config = {
    * to an empty string to turn previews off.
    */
   linkPreviewService: import.meta.env.VITE_LINK_PREVIEW_SERVICE ?? 'https://cardyb.bsky.app/v1/extract',
+  /**
+   * Semble's public AppView API (open CORS, no auth) used for suggestions.
+   * Set VITE_SEMBLE_API to an empty string to turn suggestions off.
+   */
+  sembleApi: import.meta.env.VITE_SEMBLE_API ?? 'https://api.semble.so',
   /** Where users manage App Passwords on the default (Bluesky-hosted) PDS. */
   appPasswordHelpUrl: 'https://bsky.app/settings/app-passwords',
   /** Sent as the Margin `generator` so notes are attributable to this client. */
