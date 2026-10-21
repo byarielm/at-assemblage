@@ -193,13 +193,13 @@ function Legend() {
         {CONNECTION_TYPES.map((t) => (
           <li key={t.value} className="flex items-center gap-2 text-[12.5px]">
             <TypeSwatch type={t.value} withIcon width={14} />
-            <span className="font-medium">{t.label}</span>
+            <span className="shrink-0 whitespace-nowrap font-medium">{t.label}</span>
             <span className="truncate text-ink-3">{t.description}</span>
           </li>
         ))}
         <li className="flex items-center gap-2 text-[12.5px]">
           <TypeSwatch type="__unknown__" withIcon width={14} />
-          <span className="font-medium">Other</span>
+          <span className="shrink-0 whitespace-nowrap font-medium">Other</span>
           <span className="text-ink-3">Type this app does not know</span>
         </li>
       </ul>
@@ -215,7 +215,7 @@ export function Inspector() {
   const link = selected.edges.length === 1 && count === 1 ? linksById.get(selected.edges[0]!) : undefined
 
   return (
-    <aside aria-label="Inspector" className="flex min-h-0 flex-col border-l border-line bg-surface">
+    <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-hidden border-l border-line bg-surface">
       <div className="flex h-12 shrink-0 items-center border-b border-line px-4 text-[13px] font-semibold">Inspector</div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {item ? (

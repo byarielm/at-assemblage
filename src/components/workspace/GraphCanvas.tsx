@@ -1,13 +1,13 @@
 import {
   Background,
   BackgroundVariant,
-  Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useStore,
   type Connection,
   type EdgeChange,
   type EdgeSelectionChange,
@@ -23,6 +23,7 @@ import { styleForType } from '../../services/sources/semble/connectionTypes'
 import { useUiStore } from '../../state/uiStore'
 import { CardNode, type CardNodeType } from './CardNode'
 import { ConnectionEdge, type ConnectionEdgeType } from './ConnectionEdge'
+import { ViewControls } from './ViewControls'
 import { useWorkspace } from './WorkspaceContext'
 
 const nodeTypes = { card: CardNode }
@@ -51,7 +52,10 @@ function pruneSelection(kind: 'nodes' | 'edges', before: Set<string>, now: Set<s
   if (kept.length !== selected[kind].length) setSelected({ ...selected, [kind]: kept })
 }
 
+const MINIMAP_MIN_CANVAS_WIDTH = 600
+
 export function GraphCanvas() {
+  const canvasWidth = useStore((s) => s.width)
   const { did } = useAuth()
   const { data, visible, activeGroupIds, groupNames, annotationsByItem, itemsById } = useWorkspace()
   const { fitView, getNode } = useReactFlow<CardNodeType, ConnectionEdgeType>()
@@ -60,7 +64,8 @@ export function GraphCanvas() {
   const positions = useUiStore((s) => s.positions)
   const draft = useUiStore((s) => s.draft)
   const showEdgeLabels = useUiStore((s) => s.showEdgeLabels)
-  const tidyRequest = useUiStore((s) => s.tidyRequest)
+  // The minimap and view controls both sit along the bottom; on a narrow canvas only the controls fit.
+  const showMinimap = useUiStore((s) => s.showMinimap) && canvasWidth >= MINIMAP_MIN_CANVAS_WIDTH
   const selectionRequest = useUiStore((s) => s.selectionRequest)
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null)
 
@@ -101,21 +106,6 @@ export function GraphCanvas() {
       cancelled = true
     }
   }, [missing, data.links, storageKey, fitView])
-
-  // 3. "Tidy layout": re-run ELK over the visible items only.
-  useEffect(() => {
-    if (tidyRequest === 0) return
-    const items = data.items.filter((i) => visible.itemIds.has(i.id))
-    const links = data.links.filter((l) => visible.linkIds.has(l.id))
-    layoutGraph(items, links).then((fresh) => {
-      const { positions: current, mergePositions } = useUiStore.getState()
-      mergePositions(fresh)
-      savePositions(storageKey, { ...current, ...fresh })
-      requestAnimationFrame(() => fitView({ padding: 0.15, duration: 400 }))
-    })
-    // Only on explicit request.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tidyRequest])
 
   const derivedNodes: CardNodeType[] = useMemo(() => {
     const multi = activeGroupIds.length > 1
@@ -322,16 +312,18 @@ export function GraphCanvas() {
         ariaLabelConfig={{ 'node.a11yDescription.default': 'Press Enter to select. Use arrow keys to move the selected card.' }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls showInteractive={false} position="bottom-left" />
-        <MiniMap
-          pannable
-          zoomable
-          position="bottom-right"
-          ariaLabel="Minimap"
-          nodeStrokeWidth={2}
-          nodeColor="var(--color-line-strong)"
-          maskColor="color-mix(in srgb, var(--color-canvas) 70%, transparent)"
-        />
+        <ViewControls />
+        {showMinimap ? (
+          <MiniMap
+            pannable
+            zoomable
+            position="bottom-right"
+            ariaLabel="Minimap"
+            nodeStrokeWidth={2}
+            nodeColor="var(--color-line-strong)"
+            maskColor="color-mix(in srgb, var(--color-canvas) 70%, transparent)"
+          />
+        ) : null}
       </ReactFlow>
     </div>
   )

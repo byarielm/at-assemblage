@@ -97,9 +97,10 @@ export function Workspace() {
   return (
     <ReactFlowProvider>
       <WorkspaceProvider>
-        <div className="grid h-full min-w-[1024px] grid-cols-[280px_minmax(0,1fr)_340px]">
+        {/* Locked to the viewport: the page never scrolls; only panels scroll inside themselves. */}
+        <div className="fixed inset-0 grid grid-cols-[280px_minmax(0,1fr)_340px] grid-rows-[minmax(0,1fr)] overflow-hidden">
           <Sidebar />
-          <main aria-label="Graph" className="relative flex min-h-0 flex-col">
+          <main aria-label="Graph" className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
             <div className="relative min-h-0 flex-1">
               <GraphArea />
               <Warnings />

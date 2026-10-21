@@ -180,7 +180,21 @@ lexicons.json         lexicon manifest with CIDs (committed)
 - **Graph-agnostic UI.** The canvas, filters, layout and inspector only use `GraphItem`, `GraphLink` and `Annotation` from `src/graph/model.ts`. Semble- and Margin-specific code lives in `src/services/sources/*`, and the two meet in `src/queries/useWorkspaceGraph.ts`. To add another AT Protocol app, write a new adapter and join it in there.
 - **Typed records only.** Every read goes through `client.list`/`listAll`, which validates against the generated schemas. Records that fail validation are counted and reported, never used. Every write is built with `$build` and checked with `$parse` before it is sent.
 - **Edge routing.** Every card has a handle on each side. Each edge attaches to the facing sides of its two cards: whichever axis has the larger clear gap, so side-by-side cards connect left↔right and stacked cards top↔bottom (`src/graph/edgeSides.ts`). This is recalculated from live positions, so edges follow a card while you drag it. Because edges use real handles, React Flow's drag-to-move anchors stay at the true ends.
-- **Layout.** ELK runs once for cards without a saved position, and again when you click "Tidy layout". Manual positions are saved in `localStorage`, keyed by DID and the set of selected collections. They are never written to the PDS.
+- **Layout.** ELK places cards that have no saved position yet; after that, cards stay where you put them. Manual positions are saved in `localStorage`, keyed by DID and the set of selected collections. They are never written to the PDS. A "Tidy layout" command was removed because its results weren't good enough; see [#7](https://github.com/renderghost/at-assemblage/issues/7).
+- **App shell.** The app is fixed to the window: the page itself never scrolls, and the sidebar, canvas and inspector each scroll inside themselves. On a narrow window the sidebars keep their width and the canvas shrinks.
+- **View controls.** A toolbar floats at the bottom left of the canvas:
+
+  | Control | Shortcut |
+  | --- | --- |
+  | Zoom out | `-` |
+  | Current zoom level (click to return to 100%) | `0` |
+  | Zoom in | `+` |
+  | Fit view | `1` |
+  | Zoom to selection (cards, or both ends of selected connections) | `2` |
+  | Show/hide minimap | — |
+
+  Shortcuts are ignored while you type in a field or a dialog is open. The minimap hides itself when the canvas is narrower than 600px.
+- **Reloading.** The ↻ button beside **Collections** reloads everything from your PDS: collections, cards, connections and Margin notes.
 
 ### Authentication and credentials
 
