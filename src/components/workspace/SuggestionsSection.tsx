@@ -42,48 +42,78 @@ function SuggestionRow({ suggestion, card }: { suggestion: Suggestion; card: Gra
 
   const label = connected ? styleForType(type).label : null
   return (
-    <li className="group/row flex items-start gap-2 py-1.5">
-      <div className="min-w-0 flex-1">
+    <li className="flex gap-3 rounded-lg border border-line bg-surface p-2.5">
+      <Thumbnail url={suggestion.url} imageUrl={suggestion.imageUrl} />
+      <div className="flex min-w-0 flex-1 flex-col">
         <a
           href={isHttpUrl(suggestion.url) ? suggestion.url : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          className="line-clamp-2 text-[13px] font-medium leading-snug hover:underline"
+          className="line-clamp-2 text-[13px] font-semibold leading-snug hover:underline"
           title={suggestion.url}
         >
           {suggestion.title ?? cleanUrl(suggestion.url)}
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-ink-3">
-          {connected ? (
-            <>
-              <span className="inline-flex items-center gap-1 whitespace-nowrap" title={connected.note}>
-                <TypeSwatch type={type} width={14} />
-                {direction === 'outgoing' ? `${label} →` : `← ${label}`}
-              </span>
-              <span>by {curatorsText(connected)}</span>
-            </>
-          ) : null}
-          <span>{suggestion.siteName ?? domainOf(suggestion.url)}</span>
-          {suggestion.libraryCount > 0 ? <span>· saved by {suggestion.libraryCount}</span> : null}
+        <div className="mt-0.5 truncate text-[11.5px] text-ink-3">
+          {suggestion.siteName ?? domainOf(suggestion.url)}
+          {suggestion.libraryCount > 0 ? ` · saved by ${suggestion.libraryCount}` : ''}
+        </div>
+        {connected ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-ink-2" title={connected.note}>
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+              <TypeSwatch type={type} withIcon width={12} />
+              {direction === 'outgoing' ? `${label} →` : `← ${label}`}
+            </span>
+            <span className="text-ink-3">by {curatorsText(connected)}</span>
+          </div>
+        ) : null}
+        <div className="mt-2 flex justify-end">
+          {suggestion.alreadyConnected ? (
+            <span className="inline-flex h-7 items-center gap-1 text-[12px] text-success">
+              <Icon name="check" size={13} /> Connected
+            </span>
+          ) : suggestion.myCardId ? (
+            <Button size="sm" onClick={connect} title="Already in your library: connect it to this card">
+              Connect
+            </Button>
+          ) : (
+            <Button size="sm" icon="plus" onClick={add} title="Add this page as a card, then connect it">
+              Add
+            </Button>
+          )}
         </div>
       </div>
-      <div className="shrink-0 pt-0.5">
-        {suggestion.alreadyConnected ? (
-          <span className="inline-flex items-center gap-1 text-[12px] text-success">
-            <Icon name="check" size={13} /> Connected
-          </span>
-        ) : suggestion.myCardId ? (
-          <Button size="sm" onClick={connect} title="Already in your library: connect it to this card">
-            Connect
-          </Button>
-        ) : (
-          <Button size="sm" icon="plus" onClick={add} title="Add this page as a card, then connect it">
-            Add
-          </Button>
-        )}
-      </div>
     </li>
+  )
+}
+
+/** 56px square: the page's image, else its favicon on a tinted tile, else the domain's initial. */
+function Thumbnail({ url, imageUrl }: { url: string; imageUrl?: string }) {
+  const domain = domainOf(url)
+  const sources = [imageUrl && isHttpUrl(imageUrl) ? imageUrl : null, domain ? `https://${domain}/favicon.ico` : null].filter(
+    (v): v is string => !!v,
+  )
+  const [index, setIndex] = useState(0)
+  const src = sources[index]
+  const isFavicon = !!domain && src === `https://${domain}/favicon.ico`
+  return (
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-surface-2">
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setIndex((i) => i + 1)}
+          className={isFavicon ? 'h-6 w-6' : 'h-full w-full object-cover'}
+        />
+      ) : (
+        <span aria-hidden="true" className="text-lg font-semibold uppercase text-ink-3">
+          {(domain ?? '?').charAt(0)}
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -92,11 +122,11 @@ function Group({ title, hint, items, card }: { title: string; hint: string; item
   if (items.length === 0) return null
   const shown = expanded ? items : items.slice(0, PREVIEW)
   return (
-    <div className="mt-2 first:mt-0">
+    <div className="mt-3 first:mt-0">
       <h4 className="text-[12px] font-semibold text-ink-2" title={hint}>
         {title} <span className="font-normal text-ink-3">({items.length})</span>
       </h4>
-      <ul className="divide-y divide-line">
+      <ul className="mt-1.5 space-y-2">
         {shown.map((s) => (
           <SuggestionRow key={s.key} suggestion={s} card={card} />
         ))}

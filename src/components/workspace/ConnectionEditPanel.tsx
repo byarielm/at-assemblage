@@ -8,6 +8,8 @@ import { useUiStore } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button } from '../ui/Button'
 import { TypeSwatch } from './TypeSwatch'
+import { useTypeRecommendation } from '../../queries/suggestions'
+import { TypePicker } from './TypePicker'
 import { useWorkspace } from './WorkspaceContext'
 
 const NOTE_MAX = 1000
@@ -39,7 +41,7 @@ function formatDate(iso?: string) {
  * replace it atomically so Semble's index picks the change up.
  */
 export function ConnectionEditPanel({ link }: { link: GraphLink }) {
-  const { itemsById, connectionRecords, data } = useWorkspace()
+  const { itemsById, connectionRecords, data, resolveItem } = useWorkspace()
   const requestDeleteLinks = useUiStore((s) => s.requestDeleteLinks)
   const edit = useEditConnection()
   const stored = connectionRecords.get(link.id)
@@ -51,6 +53,8 @@ export function ConnectionEditPanel({ link }: { link: GraphLink }) {
 
   const sourceId = reversed ? link.targetId : link.sourceId
   const targetId = reversed ? link.sourceId : link.targetId
+  // Badge only: an existing connection's type is never changed for you.
+  const recommendation = useTypeRecommendation(resolveItem(sourceId), resolveItem(targetId))
 
   const { plan, invalid } = useMemo((): { plan: EditPlan; invalid?: string } => {
     if (!stored) return { plan: { kind: 'noop' } }
@@ -120,7 +124,7 @@ export function ConnectionEditPanel({ link }: { link: GraphLink }) {
             <span aria-hidden="true" className="text-ink-3">
               ↓
             </span>
-            <Button size="sm" variant="ghost" aria-pressed={reversed} onClick={() => setReversed((r) => !r)}>
+            <Button size="sm" icon="swap" aria-pressed={reversed} onClick={() => setReversed((r) => !r)}>
               Reverse direction
             </Button>
           </div>
@@ -132,26 +136,15 @@ export function ConnectionEditPanel({ link }: { link: GraphLink }) {
       </section>
 
       <section className="border-t border-line px-4 py-3">
-        <label htmlFor="edit-connection-type" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">
-          Type
-        </label>
-        <div className="flex items-center gap-2">
-          <TypeSwatch type={type || undefined} />
-          <select
-            id="edit-connection-type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="h-8 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-[13px] focus:border-accent focus:outline-none"
-          >
-            {CONNECTION_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label} — {t.description}
-              </option>
-            ))}
-            {originalType && !knownTypes.includes(originalType) ? <option value={originalType}>{originalType} (current, unknown)</option> : null}
-            {!originalType ? <option value="">Untyped (current)</option> : null}
-          </select>
-        </div>
+        <TypePicker
+          name="edit-connection-type"
+          legend="Type"
+          legendClassName="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3"
+          value={type}
+          onChange={setType}
+          recommendation={recommendation}
+          currentUnknown={originalType && knownTypes.includes(originalType) ? undefined : originalType}
+        />
       </section>
 
       <section className="border-t border-line px-4 py-3">
@@ -166,7 +159,7 @@ export function ConnectionEditPanel({ link }: { link: GraphLink }) {
           rows={3}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Why are these connected?"
+          placeholder={typeInfo(type)?.notePlaceholder ?? 'Why are these connected?'}
           aria-invalid={!!invalid}
           className="w-full resize-y rounded-md border border-line bg-surface px-2.5 py-1.5 text-[13px] focus:border-accent focus:outline-none"
         />

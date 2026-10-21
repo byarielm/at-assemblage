@@ -165,7 +165,6 @@ function ItemDetails({ item }: { item: GraphItem }) {
           </ul>
         )}
       </Section>
-      {item.url && isHttpUrl(item.url) ? <SuggestionsSection key={item.url} card={item as GraphItem & { url: string }} /> : null}
       <Section title={`Margin notes (${annotations.length})`}>
         {margin.isError ? <Alert tone="warning">Could not load Margin notes. {describeError(margin.error).message}</Alert> : null}
         {annotations.length > 0 ? (
@@ -182,6 +181,7 @@ function ItemDetails({ item }: { item: GraphItem }) {
         )}
         {item.url ? <MarginNoteForm item={item as GraphItem & { url: string }} /> : null}
       </Section>
+      {item.url && isHttpUrl(item.url) ? <SuggestionsSection key={item.url} card={item as GraphItem & { url: string }} /> : null}
     </>
   )
 }
@@ -192,13 +192,13 @@ function Legend() {
       <ul className="space-y-1">
         {CONNECTION_TYPES.map((t) => (
           <li key={t.value} className="flex items-center gap-2 text-[12.5px]">
-            <TypeSwatch type={t.value} />
+            <TypeSwatch type={t.value} withIcon width={14} />
             <span className="font-medium">{t.label}</span>
             <span className="truncate text-ink-3">{t.description}</span>
           </li>
         ))}
         <li className="flex items-center gap-2 text-[12.5px]">
-          <TypeSwatch type="__unknown__" />
+          <TypeSwatch type="__unknown__" withIcon width={14} />
           <span className="font-medium">Other</span>
           <span className="text-ink-3">Type this app does not know</span>
         </li>

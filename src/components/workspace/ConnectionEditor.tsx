@@ -1,18 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useForm, useWatch } from 'react-hook-form'
+import { useEffect } from 'react'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import type { GraphItem } from '../../graph/model'
 import { useCreateConnection } from '../../queries/semble'
-import {
-  CONNECTION_TYPES,
-  DEFAULT_CONNECTION_TYPE,
-  typeInfo,
-} from '../../services/sources/semble/connectionTypes'
+import { DEFAULT_CONNECTION_TYPE, typeInfo } from '../../services/sources/semble/connectionTypes'
 import { isDuplicateLink } from '../../services/sources/semble/mapping'
 import { useUiStore, type LinkDraft } from '../../state/uiStore'
 import { Alert } from '../ui/Alert'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
+import { useTypeRecommendation } from '../../queries/suggestions'
+import { TypePicker } from './TypePicker'
 import { useWorkspace } from './WorkspaceContext'
 
 const NOTE_MAX = 1000
@@ -41,18 +40,27 @@ function EditorForm({ draft, source, target }: { draft: LinkDraft; source: Graph
   const { data } = useWorkspace()
   const setDraft = useUiStore((s) => s.setDraft)
   const create = useCreateConnection()
+  const recommendation = useTypeRecommendation(source, target)
+  const explicitType = typeInfo(draft.type)?.value
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    setValue,
+    formState: { errors, dirtyFields },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { type: typeInfo(draft.type)?.value ?? DEFAULT_CONNECTION_TYPE, note: draft.note ?? '' },
+    defaultValues: { type: explicitType ?? recommendation?.type ?? DEFAULT_CONNECTION_TYPE, note: draft.note ?? '' },
   })
   const type = useWatch({ control, name: 'type' })
   const note = useWatch({ control, name: 'note' })
   const duplicate = isDuplicateLink(data.links, source.id, target.id, type)
+
+  // The recommendation may arrive after the form opens: preselect it unless the type was given
+  // explicitly (e.g. from a suggestion) or the user has already chosen one.
+  useEffect(() => {
+    if (recommendation && !explicitType && !dirtyFields.type) setValue('type', recommendation.type)
+  }, [recommendation, explicitType, dirtyFields.type, setValue])
 
   const onSubmit = handleSubmit((values) => {
     // Close immediately: the optimistic edge shows progress on the canvas.
@@ -80,36 +88,30 @@ function EditorForm({ draft, source, target }: { draft: LinkDraft; source: Graph
       <div className="flex justify-end">
         <Button
           size="sm"
-          variant="ghost"
-          onClick={() => setDraft({ sourceId: target.id, targetId: source.id, type, note })}
+          icon="swap"
+          onClick={() =>
+            setDraft({ sourceId: target.id, targetId: source.id, type: dirtyFields.type || explicitType ? type : undefined, note })
+          }
         >
           Swap direction
         </Button>
       </div>
 
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium">Relationship</legend>
-        <div className="grid grid-cols-2 gap-1.5">
-          {CONNECTION_TYPES.map((t) => (
-            <label
-              key={t.value}
-              className="flex cursor-pointer items-start gap-2 rounded-md border border-line px-2.5 py-1.5 has-[:checked]:border-accent has-[:checked]:bg-accent-soft"
-            >
-              <input type="radio" value={t.value} className="mt-1 accent-[var(--color-accent)]" {...register('type')} />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-[13px] font-medium">
-                  <svg width="22" height="6" aria-hidden="true">
-                    <line x1="0" y1="3" x2="22" y2="3" stroke={t.colour} strokeWidth="2.5" strokeDasharray={t.dash} />
-                  </svg>
-                  {t.label}
-                </span>
-                <span className="block text-[11.5px] leading-tight text-ink-3">{t.description}</span>
-              </span>
-            </label>
-          ))}
-        </div>
+      <div>
+        <Controller
+          control={control}
+          name="type"
+          render={({ field }) => (
+            <TypePicker
+              name="new-connection-type"
+              value={field.value}
+              onChange={(v) => field.onChange(v)}
+              recommendation={recommendation}
+            />
+          )}
+        />
         {errors.type ? <p className="mt-1 text-[13px] text-danger">{errors.type.message}</p> : null}
-      </fieldset>
+      </div>
 
       <div className="space-y-1.5">
         <label htmlFor="connection-note" className="flex justify-between text-sm font-medium">
@@ -124,7 +126,7 @@ function EditorForm({ draft, source, target }: { draft: LinkDraft; source: Graph
           id="connection-note"
           rows={3}
           className="w-full resize-y rounded-md border border-line bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none"
-          placeholder="Why are these connected?"
+          placeholder={typeInfo(type)?.notePlaceholder ?? 'Why are these connected?'}
           aria-invalid={!!errors.note}
           {...register('note')}
         />

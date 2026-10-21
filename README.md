@@ -50,7 +50,27 @@ These are what Semble actually stores. They differ in places from the original b
 | Connection | `network.cosmik.connection` | `source`, `target` (URL **or** AT URI), optional `connectionType`, optional `note`. Semble's own UI writes card URLs, and so do we. |
 | Margin note | `at.margin.note` (revision 4) | W3C Web Annotation model. Margin's older `at.margin.annotation` schema is not used. |
 
-**Connection types.** These come from Semble's `ConnectionTypeEnum`: `RELATED`, `SUPPORTS`, `OPPOSES`, `ADDRESSES`, `HELPFUL`, `EXPLAINER`, `LEADS_TO`, `SUPPLEMENT`, `REFERENCES`, `SAME_AS`. The value is `SUPPLEMENT`, not `SUPPLEMENTS`. The lexicon allows any string, so unrecognised values are drawn as neutral dashed edges labelled with the raw value.
+**Connection types.** These match what Semble shows today:
+
+- **Values** come from `ConnectionTypeEnum`.
+- **Labels, descriptions, order, note placeholders and icon meanings** come from Semble's web app (`src/webapp/features/connections/const/connectionTypes.ts`).
+
+Labels read as verbs from source to target. Stored values never change, so a rename such as `HELPFUL` → **Adds context to** doesn't affect existing records.
+
+| Value | Label | Description |
+| --- | --- | --- |
+| `RELATED` | Relates to | Generally connected or associated |
+| `SUPPORTS` | Supports | Provides evidence or reasoning in favour |
+| `OPPOSES` | Opposes | Provides counter-evidence or reasoning against |
+| `ADDRESSES` | Addresses | Responds to or answers a question or topic |
+| `HELPFUL` | Adds context to | Provides useful context or background |
+| `LEADS_TO` | Leads to | Led me to discover this |
+| `EXPLAINER` | Explains | Explains or summarises for a broader audience |
+| `SUPPLEMENT` | Supplements | Accompanying resources (e.g. data, code, other supplemental material) |
+| `SAME_AS` | Same as | The same thing in a different place (mirror, reupload, DOI) |
+| `REFERENCES` | References | Cites or points to the other |
+
+Each type has an icon, a colour and a dash pattern, so colour is never the only cue. The lexicon allows any string, so unrecognised values are drawn as neutral dashed edges labelled with the raw value.
 
 **Loading.** We read all of your cards, collection links and connections once each, following the cursors. Then we join them in the browser:
 
@@ -88,7 +108,12 @@ Select a card and the inspector shows **Suggestions from Semble**, built only fr
 | **Connected by others** | `network.cosmik.connection.getForUrl` (both directions) | Pages other people connected to or from this page, with their relationship type and direction. Several people making the same connection merge into one entry ("by @alice and 2 others"), ranked by how many made it. Your own connections are left out, because they're already on the canvas. |
 | **Similar pages** | `network.cosmik.search.getSimilarUrls` | Semantically similar pages across Semble, minus the page itself and anything already listed above. |
 
-Each entry shows the site and how many Semble libraries hold it, plus one action:
+Suggestions sit at the bottom of the inspector, below Margin notes. Each is a small card showing:
+
+- a 56px thumbnail: Semble's image for the page, else the site's favicon on a tinted tile, else the domain's initial
+- the title, the site, and how many Semble libraries hold it
+- for "Connected by others", the relationship and who made it
+- one action:
 
 - **Connect** if the page is already one of your cards, even one in a collection that isn't on the canvas. It opens the connection editor, prefilled with the other person's relationship type and direction.
 - **Add** if it isn't. It opens the add-card form with Semble's title and description, and the selected card's collections ticked. After saving, the connection editor opens with the type prefilled. The selected card stays selected, so you can keep working through its list.
@@ -99,6 +124,26 @@ Results are cached per URL for the session. If either source fails, the other's 
 "In my library" is worked out locally from your PDS data, because anonymous calls to Semble don't return `urlInLibrary`.
 
 Semble's other public endpoints are next: collections containing a URL, other people's notes on it, and dismissals ([#4](https://github.com/renderghost/at-assemblage/issues/4)). Reading pages for key phrases and links is stashed in [#3](https://github.com/renderghost/at-assemblage/issues/3).
+
+### Recommended connection type
+
+The New-connection form, the Edit form in the inspector, and bulk retype all use the same single-column radio list: icon, edge swatch, label and description for each type.
+
+A type is marked **Recommended** (a sparkle badge plus one line saying why) only when there is a strong signal. Otherwise nothing is recommended. The logic is in `src/services/sources/semble/recommendType.ts`.
+
+1. **Same resource → Same as.** Any of:
+   - the same DOI (from metadata or a `doi.org` link)
+   - the same ISBN
+   - one page is a web-archive copy of the other (Wayback Machine, archive.today)
+   - the same page under a cosmetically different URL: `www.`, http/https, trailing slash, or tracking parameters such as `utm_*`, `fbclid`, `gclid`
+2. **Other people's consensus.** Semble's `connection.getForUrl` shows how others connected these exact two pages, in this direction. A type is recommended when at least **2 people** connected them and **more than half** chose it. Each person counts once, your own connections are excluded, and it must be a type Semble defines. This lookup shares its cache with the suggestions list.
+
+How the badge behaves in each form:
+
+| Form | Behaviour |
+| --- | --- |
+| New connection | The recommended type is preselected, unless you arrived with an explicit type (for example from a suggestion row) or have already picked one. **Swap direction** recalculates the recommendation. |
+| Edit connection | The badge is shown, but your stored type is never changed for you. |
 
 ### Editing connections
 
@@ -196,6 +241,7 @@ npm test
 | `src/services/sources/semble/create.test.ts` | New card, note and link records shaped like Semble's; URL validation; reusing an existing card (links only for missing collections, one note per link); a single commit whose locally computed CIDs match the PDS's; collection records and lexicon limits |
 | `src/services/linkPreview.test.ts` | Preview mapping; failure and disabled cases |
 | `src/services/sources/semble/appview.test.ts` | Semble API calls (plain GET, no credentials), lenient response validation, error mapping |
+| `src/services/sources/semble/recommendType.test.ts` | Same-resource signals (DOI, ISBN, archive copies, cosmetic URL differences) and staying silent for different pages. Consensus thresholds (2+ people, majority, same direction, one vote per person, own connections and unknown types excluded). Same-resource takes priority. |
 | `src/services/sources/semble/suggestions.test.ts` | Direction from either end (including `www.` variants), skipping your own connections, merging curators and ranking, flagging pages in your library and connections already made, de-duplicating similar pages |
 
 The integration tests use `src/test/fakePds.ts`. This is an in-memory PDS, PLC directory and handle resolver. The real `@atproto/lex` client and `PasswordSession` run against it over `fetch`, including token expiry, revocation, cursors and injected failures. Like a real PDS, it hashes each created record as received to produce its CID.
@@ -245,6 +291,17 @@ A fourth run covered suggestions, with Semble's API mocked:
 - Add then connect: the form was prefilled with no link-preview call, the card's collection was ticked, then Supports was prefilled and saved
 - rows switching to **Connected**
 - Semble returning 503: the error and Retry showed, and Retry recovered
+
+A fifth run covered the polish work:
+
+- suggestions below Margin notes, with image and initial-tile thumbnails
+- Semble's ten labels in the picker
+- the consensus recommendation preselected after Add-and-connect and when dragging Zoning → Parking
+- swapping direction clearing a recommendation that no longer applies
+- an archived copy recommending **Same as**
+- no badge without a strong signal
+- the Edit form showing the badge without changing the stored type
+- swap and reverse as bordered buttons with icons
 
 Scale, measured in headless Chromium with software rendering:
 

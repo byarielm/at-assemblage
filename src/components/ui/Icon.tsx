@@ -19,6 +19,20 @@ const PATHS = {
   plus: 'M12 5v14M5 12h14',
   chevronUp: 'M6 15l6-6 6 6',
   copy: 'M9 9h10v10H9zM5 15V5h10',
+  swap: 'M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4',
+  sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  // Connection types (meanings follow Semble's icon choices)
+  typeRelated: 'M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.43M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.33-1.33',
+  typeSupports: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6',
+  typeOpposes: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 9l6 6M15 9l-6 6',
+  typeAddresses: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
+  typeContext: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
+  typeLeadsTo: 'M5 12h14M13 6l6 6-6 6',
+  typeExplains: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0 0 12 3z',
+  typeSupplements: 'M20 11l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 17a2 2 0 0 1-3-3l7.5-7.5',
+  typeSameAs: 'M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4',
+  typeReferences: 'M5 7h5v5c0 3-1.5 5-4.5 6M14 7h5v5c0 3-1.5 5-4.5 6',
+  typeUnknown: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12h8',
 } as const
 
 export type IconName = keyof typeof PATHS
